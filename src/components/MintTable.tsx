@@ -38,7 +38,10 @@ const MintTable = () => {
 
     endorsementSub.on("event", (event: NDKEvent) => {
       dispatch(
-        addMintEndorsement({ event: event.rawEvent(), infoEventRelay: undefined })
+        addMintEndorsement({
+          event: event.rawEvent(),
+          infoEventRelay: undefined,
+        })
       );
     });
   }, [ndk, dispatch]);
@@ -54,40 +57,47 @@ const MintTable = () => {
 
   return (
     <Tabs className="w-full" style="fullWidth">
-      <Tabs.Item title="Endorsements" className="focus:shadow-none focus:border-transparent">
-        <div className="overflow-x-auto overflow-y-auto max-h-screen">
+      <Tabs.Item title="Mints">
+      <div className="overflow-x-auto overflow-y-auto max-h-screen">
 
-        <Table className="w-full">
-          <Table.Head className="">
+        <Table className="overflow-x-auto">
+          <Table.Head>
+            <Table.HeadCell>Mint URL</Table.HeadCell>
+            <Table.HeadCell>Supported Nuts</Table.HeadCell>
+            <Table.HeadCell>
+              <span className="sr-only">Review</span>
+            </Table.HeadCell>
+          </Table.Head>
+          <Table.Body>
+            {mints.map((mint, idx) => (
+              <TableRowMint mint={mint} key={idx} />
+            ))}
+          </Table.Body>
+        </Table>
+        </div>
+      </Tabs.Item>
+      <Tabs.Item
+        title="Reviews"
+        className="focus:shadow-none focus:border-transparent"
+      >
+        <div className="overflow-x-auto overflow-y-auto max-h-screen">
+          <Table className="w-full">
+            <Table.Head className="">
               <Table.HeadCell>Endorsed By</Table.HeadCell>
               <Table.HeadCell>Mint URL</Table.HeadCell>
               <Table.HeadCell>Rating</Table.HeadCell>
               <Table.HeadCell>Review</Table.HeadCell>
               <Table.HeadCell>
-                <span className="sr-only">Endorse or Delete</span>
+                <span className="sr-only">Review or Delete</span>
               </Table.HeadCell>
-          </Table.Head>
-          <Table.Body className="divide-y">
-            {endorsements.map((endorsement, idx) => <TableRowEndorsement endorsement={endorsement} key={idx}/>)}
-          </Table.Body>
-        </Table>
+            </Table.Head>
+            <Table.Body className="divide-y">
+              {endorsements.map((endorsement, idx) => (
+                <TableRowEndorsement endorsement={endorsement} key={idx} />
+              ))}
+            </Table.Body>
+          </Table>
         </div>
-
-      </Tabs.Item>
-
-      <Tabs.Item title="Mints">
-        <Table className="w-full">
-          <Table.Head>
-              <Table.HeadCell>Mint URL</Table.HeadCell>
-              <Table.HeadCell>Supported Nuts</Table.HeadCell>
-              <Table.HeadCell>
-                <span className="sr-only">Endorse</span>
-              </Table.HeadCell>
-          </Table.Head>
-          <Table.Body>
-            {mints.map((mint, idx) => <TableRowMint mint={mint} key={idx} />)}
-          </Table.Body>
-        </Table>
       </Tabs.Item>
     </Tabs>
   );

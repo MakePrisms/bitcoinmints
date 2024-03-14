@@ -1,19 +1,19 @@
 import { Button, Modal, TextInput, Label, Rating } from "flowbite-react";
 
-interface ClaimEndorseModalProps {
+interface ListReviewModalProps {
   show: boolean;
   onClose: () => void;
   mintUrl: string;
   setMintUrl: (url: string) => void;
   handleSubmit: () => void;
-  type: "endorse" | "claim";
+  type: "review" | "claim";
   rating?: number;
   setRating?: (rating: number) => void;
   review?: string;
   setReview?: (review: string) => void;
 }
 
-const ClaimEndorseModal = ({
+const ListReviewModal = ({
   show,
   onClose,
   mintUrl,
@@ -24,9 +24,9 @@ const ClaimEndorseModal = ({
   setRating,
   review,
   setReview,
-}: ClaimEndorseModalProps) => {
-  const title = type === "endorse" ? "Endorse Mint" : "Claim Mint";
-  const submitText = type === "endorse" ? "Endorse" : "Claim";
+}: ListReviewModalProps) => {
+  const title = type === "review" ? "Review Mint" : "List Mint";
+  const submitText = type === "review" ? "Publish Endorsement" : "Publish Listing";
   return (
     <Modal show={show} onClose={onClose} size="md" popup>
       <Modal.Header />
@@ -85,4 +85,4 @@ const ClaimEndorseModal = ({
   );
 };
 
-export default ClaimEndorseModal;
+export default ListReviewModal;

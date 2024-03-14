@@ -4,6 +4,7 @@ import NDK, { NDKEvent, NDKKind, NDKSigner, NDKUserProfile, NostrEvent } from "@
 interface NDKContextProps {
   ndk: NDK;
   setSigner: (signer: NDKSigner) => void;
+  removeSigner: () => void;
   fetchUserProfile: (pubkey: string) => Promise<NDKUserProfile | undefined>;
   attemptDeleteEvent: (event: NostrEvent) => Promise<NDKEvent>;
 }
@@ -11,6 +12,7 @@ interface NDKContextProps {
 const NDKContext = createContext<NDKContextProps>({
   ndk: new NDK(),
   setSigner: (signer: NDKSigner) => {},
+  removeSigner: () => {},
   fetchUserProfile: async (pubkey: string): Promise<NDKUserProfile> =>
     ({} as NDKUserProfile),
   attemptDeleteEvent: async (event: NostrEvent): Promise<NDKEvent> =>
@@ -48,6 +50,10 @@ export const NDKProvider = ({ children }: any) => {
     ndk.current.assertSigner();
   };
 
+  const removeSigner = () => {
+    ndk.current.signer = undefined;
+  }
+
   const fetchUserProfile = async (pubkey: string) => {
     const user = ndk.current.getUser({ pubkey });
     await user.fetchProfile();
@@ -64,6 +70,7 @@ export const NDKProvider = ({ children }: any) => {
   const contextValue: NDKContextProps = {
     ndk: ndk.current,
     setSigner,
+    removeSigner,
     fetchUserProfile,
     attemptDeleteEvent,
   };

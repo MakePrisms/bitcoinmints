@@ -12,7 +12,7 @@ const ProfileButton = () => {
 
   const dipsatch = useDispatch();
 
-  const { setSigner, fetchUserProfile } = useNdk();
+  const { setSigner, removeSigner, fetchUserProfile } = useNdk();
 
   const user = useSelector((state: RootState) => state.user);
 
@@ -36,6 +36,7 @@ const ProfileButton = () => {
   const handleLogout = () => {
     dipsatch(setUser({ pubkey: "" }));
     window.localStorage.removeItem("pubkey");
+    removeSigner();
   };
 
   const handleLogin = async () => {

@@ -2,12 +2,14 @@ import { useState } from "react";
 import { Button, Table, Tooltip } from "flowbite-react";
 import { TrashIcon } from "@heroicons/react/24/outline";
 import { Nip87MintInfo } from "@/types";
-import ClaimEndorseModal from "./ClaimEndorseModal";
+import ListReviewModal from "./ListReviewModal";
 import { nip87Reccomendation } from "@/utils/nip87";
 import { useNdk } from "@/hooks/useNdk";
 import { useDispatch, useSelector } from "react-redux";
 import { RootState } from "@/redux/store";
 import { deleteMintInfo } from "@/redux/slices/nip87Slice";
+import ReviewMintButton from "./ReviewMintButton";
+import { copyToClipboard, shortenString } from "@/utils";
 
 const TableRowMint = ({ mint }: { mint: Nip87MintInfo }) => {
   const [show, setShow] = useState(false);
@@ -27,7 +29,7 @@ const TableRowMint = ({ mint }: { mint: Nip87MintInfo }) => {
 
   const handleModalClose = () => {
     setShow(false);
-  }
+  };
 
   const handleModalSubmit = async () => {
     const endorsement = await nip87Reccomendation(ndk, mint);
@@ -39,7 +41,14 @@ const TableRowMint = ({ mint }: { mint: Nip87MintInfo }) => {
   return (
     <>
       <Table.Row className="dark:bg-gray-800">
-        <Table.Cell>{mint.mintUrl}</Table.Cell>
+        <Table.Cell
+          className="hover:cursor-pointer"
+          onClick={() => copyToClipboard(mint.mintUrl)}
+        >
+          <Tooltip content="click to copy">
+            {shortenString(mint.mintUrl)}
+          </Tooltip>
+        </Table.Cell>
         <Table.Cell>{mint.supportedNuts || "N/A"}</Table.Cell>
         <Table.Cell>
           {user.pubkey === mint.appPubkey ? (
@@ -50,18 +59,10 @@ const TableRowMint = ({ mint }: { mint: Nip87MintInfo }) => {
               />
             </Tooltip>
           ) : (
-            <Button onClick={() => setShow(true)}>Endorse</Button>
+            <ReviewMintButton mint={mint} text="Review" />
           )}
         </Table.Cell>
       </Table.Row>
-      <ClaimEndorseModal
-        show={show}
-        onClose={handleModalClose}
-        mintUrl={mint.mintUrl}
-        setMintUrl={() => {}}
-        handleSubmit={handleModalSubmit}
-        type="claim"
-      />
     </>
   );
 };

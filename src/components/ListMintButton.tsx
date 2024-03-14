@@ -1,14 +1,14 @@
 import { useState } from "react";
 import { getMintInfo } from "@/utils/cashu";
 import { Button } from "flowbite-react";
-import ClaimEndorseModal from "./ClaimEndorseModal";
+import ListReviewModal from "./ListReviewModal";
 import { nip87Info } from "@/utils/nip87";
 import { useNdk } from "@/hooks/useNdk";
 import { Nip87MintTypes } from "@/types";
 import { useDispatch } from "react-redux";
 import { addMint } from "@/redux/slices/nip87Slice";
 
-const ClaimMintButton = () => {
+const ListMintButton = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [mintUrl, setMintUrl] = useState("");
 
@@ -21,14 +21,17 @@ const ClaimMintButton = () => {
   };
 
   const handleMintSubmit = async () => {
-    console.log("mintUrl", mintUrl)
+    console.log("mintUrl", mintUrl);
     try {
       const { supportedNuts, v0, v1, pubkey } = await getMintInfo(mintUrl);
 
-      console.log("mintInfo", supportedNuts, v0, v1, pubkey)
-      
-      if (!pubkey) alert ("Your mint does not return a pubkey from the /info endpoint. You should add one and try again.")
-      
+      console.log("mintInfo", supportedNuts, v0, v1, pubkey);
+
+      if (!pubkey)
+        alert(
+          "Your mint does not return a pubkey from the /info endpoint. You should add one and try again."
+        );
+
       const mintInfoEvent = await nip87Info(ndk, Nip87MintTypes.Cashu, {
         mintPubkey: pubkey,
         mintUrl,
@@ -37,16 +40,16 @@ const ClaimMintButton = () => {
 
       console.log("mintInfoEvent", mintInfoEvent.rawEvent());
       await mintInfoEvent.publish();
-      dispatch(addMint({ event: mintInfoEvent.rawEvent()}))
+      dispatch(addMint({ event: mintInfoEvent.rawEvent() }));
       handleModalClose();
     } catch (e) {
       console.error(e);
     }
   };
   return (
-    <>
-      <Button className="" onClick={() => setIsModalOpen(true)}>Claim a Mint</Button>
-      <ClaimEndorseModal
+    <div>
+      <Button onClick={() => setIsModalOpen(true)}>List a Mint</Button>
+      <ListReviewModal
         show={isModalOpen}
         onClose={handleModalClose}
         handleSubmit={handleMintSubmit}
@@ -54,8 +57,8 @@ const ClaimMintButton = () => {
         setMintUrl={setMintUrl}
         type="claim"
       />
-    </>
+    </div>
   );
 };
 
-export default ClaimMintButton;
+export default ListMintButton;

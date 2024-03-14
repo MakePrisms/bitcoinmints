@@ -2,15 +2,15 @@ import { Button } from "flowbite-react";
 import { useNdk } from "@/hooks/useNdk";
 import { useState } from "react";
 import { getMintInfo } from "@/utils/cashu";
-import ClaimEndorseModal from "./ClaimEndorseModal";
-import { Nip87MintInfo, Nip87MintTypes, Nip87ReccomendationData } from "@/types";
-import { nip87Info, nip87Reccomendation } from "@/utils/nip87";
+import ListReviewModal from "./ListReviewModal";
+import { Nip87MintInfo, Nip87ReccomendationData } from "@/types";
+import { nip87Reccomendation } from "@/utils/nip87";
 import { useDispatch } from "react-redux";
 import { addMintEndorsement } from "@/redux/slices/nip87Slice";
 
-const PostMintButton = ({mint}: {mint?: Nip87MintInfo}) => {
+const ReviewMintButton = ({mint, text}: {mint?: Nip87MintInfo, text: string;}) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [mintUrl, setMintUrl] = useState("");
+  const [mintUrl, setMintUrl] = useState(mint?.mintUrl || "");
   const [rating, setRating] = useState(0);
   const [review, setReview] = useState("");
 
@@ -50,22 +50,22 @@ const PostMintButton = ({mint}: {mint?: Nip87MintInfo}) => {
   };
 
   return (
-    <>
-      <Button className="" onClick={() => setIsModalOpen(true)}>Endorse a Mint</Button>
-      <ClaimEndorseModal
+    <div>
+      <Button className="" onClick={() => setIsModalOpen(true)}>{text}</Button>
+      <ListReviewModal
         show={isModalOpen}
         onClose={handleModalClose}
         mintUrl={mintUrl}
         setMintUrl={setMintUrl}
         handleSubmit={handleModalSubmit}
-        type="endorse"
+        type="review"
         rating={rating}
         setRating={setRating}
         review={review}
         setReview={setReview}
       />
-    </>
+    </div>
   );
 };
 
-export default PostMintButton;
+export default ReviewMintButton;
