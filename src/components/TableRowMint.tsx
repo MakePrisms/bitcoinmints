@@ -1,9 +1,7 @@
 import { useState } from "react";
 import { Button, Table, Tooltip } from "flowbite-react";
-import { HiTrash } from "react-icons/hi";
+import { BsClipboard2, BsClipboard2CheckFill, BsTrash } from "react-icons/bs";
 import { Nip87MintInfo } from "@/types";
-import ListReviewModal from "./ListReviewModal";
-import { nip87Reccomendation } from "@/utils/nip87";
 import { useNdk } from "@/hooks/useNdk";
 import { useDispatch, useSelector } from "react-redux";
 import { RootState } from "@/redux/store";
@@ -12,6 +10,7 @@ import ReviewMintButton from "./ReviewMintButton";
 import { copyToClipboard, shortenString } from "@/utils";
 
 const TableRowMint = ({ mint }: { mint: Nip87MintInfo }) => {
+  const [copied, setCopied] = useState(false);
   const [show, setShow] = useState(false);
 
   const user = useSelector((state: RootState) => state.user);
@@ -31,25 +30,31 @@ const TableRowMint = ({ mint }: { mint: Nip87MintInfo }) => {
     setShow(false);
   };
 
-  const handleModalSubmit = async () => {
-    const endorsement = await nip87Reccomendation(ndk, mint);
-    console.log("endorsement", endorsement.rawEvent());
-    await endorsement.publish();
-    handleModalClose();
+  const handleCopy = () => {
+    copyToClipboard(mint.mintUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 3000);
   };
 
   return (
     <>
       <Table.Row className="dark:bg-gray-800">
         <Table.Cell>{mint.mintName}</Table.Cell>
+        <Table.Cell className="hover:cursor-pointer" onClick={handleCopy}>
+          <div className="flex">
             {shortenString(mint.mintUrl)}
-          </Tooltip>
+            {copied ? (
+              <BsClipboard2CheckFill className="ml-1 mt-1" size={15} />
+            ) : (
+              <BsClipboard2 className="ml-1 mt-1" size={15} />
+            )}
+          </div>
         </Table.Cell>
         <Table.Cell>{mint.supportedNuts || "N/A"}</Table.Cell>
         <Table.Cell>
           {user.pubkey === mint.appPubkey ? (
             <Tooltip content="Attempt to delete">
-              <HiTrash
+              <BsTrash
                 onClick={handleDelete}
                 className="h-6 w-6 text-red-600 hover:cursor-pointer"
               />
