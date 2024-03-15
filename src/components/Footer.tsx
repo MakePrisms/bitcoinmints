@@ -62,7 +62,7 @@ const Footer = () => {
           </div>
           <div className="mt-4 flex space-x-6 sm:mt-0 sm:justify-center">
             <FlowbiteFooter.Icon
-              href="https://twitter.com/makeprisms"
+              href="https://primal.net/p/npub1arcweuxy0zkdcg08sljh058qp02ytrgnpzh4csa3ar42szyfgrpsw6ggtw"
               target="__blank"
               icon={CustomOstriche}
             />
