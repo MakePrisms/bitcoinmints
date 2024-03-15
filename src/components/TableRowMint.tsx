@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Button, Table, Tooltip } from "flowbite-react";
-import { TrashIcon } from "@heroicons/react/24/outline";
+import { HiTrash } from "react-icons/hi";
 import { Nip87MintInfo } from "@/types";
 import ListReviewModal from "./ListReviewModal";
 import { nip87Reccomendation } from "@/utils/nip87";
@@ -53,7 +53,7 @@ const TableRowMint = ({ mint }: { mint: Nip87MintInfo }) => {
         <Table.Cell>
           {user.pubkey === mint.appPubkey ? (
             <Tooltip content="Attempt to delete">
-              <TrashIcon
+              <HiTrash
                 onClick={handleDelete}
                 className="h-6 w-6 text-red-600 hover:cursor-pointer"
               />

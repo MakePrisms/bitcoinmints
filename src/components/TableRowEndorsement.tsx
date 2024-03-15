@@ -1,6 +1,6 @@
 import { useDispatch, useSelector } from "react-redux";
 import { Rating, Table, Tooltip } from "flowbite-react";
-import { TrashIcon } from "@heroicons/react/24/outline";
+import { HiTrash } from "react-icons/hi";
 import NostrProfile from "./NostrProfile";
 import { Nip87MintReccomendation } from "@/types";
 import { RootState } from "@/redux/store";
@@ -54,7 +54,7 @@ const TableRowEndorsement = ({
       <Table.Cell>
         {user.pubkey === endorsement.userPubkey && (
           <Tooltip content="Attempt to delete">
-            <TrashIcon
+            <HiTrash
               onClick={handleDelete}
               className="h-6 w-6 text-red-600 hover:cursor-pointer"
             />

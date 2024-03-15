@@ -59,7 +59,6 @@ const MintTable = () => {
     <Tabs className="w-full" style="fullWidth">
       <Tabs.Item title="Mints">
       <div className="overflow-x-auto overflow-y-auto max-h-screen">
-
         <Table className="overflow-x-auto">
           <Table.Head>
             <Table.HeadCell>Mint URL</Table.HeadCell>
