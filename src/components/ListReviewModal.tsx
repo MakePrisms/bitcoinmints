@@ -11,6 +11,7 @@ interface ListReviewModalProps {
   setRating?: (rating: number) => void;
   review?: string;
   setReview?: (review: string) => void;
+  isProcessing: boolean;
 }
 
 const ListReviewModal = ({
@@ -24,6 +25,7 @@ const ListReviewModal = ({
   setRating,
   review,
   setReview,
+  isProcessing
 }: ListReviewModalProps) => {
   const title = type === "review" ? "Review Mint" : "List Mint";
   const submitText = type === "review" ? "Publish Review" : "Publish Listing";
@@ -77,7 +79,7 @@ const ListReviewModal = ({
             ) : null
           }
           <div className="w-full">
-            <Button onClick={handleSubmit}>{submitText}</Button>
+            <Button isProcessing={isProcessing} onClick={handleSubmit}>{submitText}</Button>
           </div>
         </div>
       </Modal.Body>

@@ -64,8 +64,8 @@ const nip87Slice = createSlice({
       mintUrls.forEach((mintUrl) => {
         const exists = state.mints.find(
           (mint) =>
-            `${mint.mintUrl}${mint.appPubkey}` ===
-            `${mintUrl}${action.payload.event.pubkey}`
+            `${mint.mintUrl}` ===
+            `${mintUrl}`
         );
 
         if (!exists) {

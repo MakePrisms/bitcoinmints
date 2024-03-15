@@ -5,12 +5,16 @@ import ListReviewModal from "./ListReviewModal";
 import { nip87Info } from "@/utils/nip87";
 import { useNdk } from "@/hooks/useNdk";
 import { Nip87MintTypes } from "@/types";
-import { useDispatch } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import { addMint } from "@/redux/slices/nip87Slice";
+import { RootState } from "@/redux/store";
 
 const ListMintButton = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [mintUrl, setMintUrl] = useState("");
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  const mints = useSelector((state: RootState) => state.nip87.mints);
 
   const { ndk } = useNdk();
 
@@ -18,12 +22,25 @@ const ListMintButton = () => {
 
   const handleModalClose = () => {
     setIsModalOpen(false);
+    setIsProcessing(false);
   };
 
   const handleMintSubmit = async () => {
-    console.log("mintUrl", mintUrl);
+    const mintExists = mints.find((mint) => mint.mintUrl === mintUrl);
+
+    if (mintExists) {
+      alert("Mint already listed");
+      return;
+    }
+
+    setIsProcessing(true);
+    
     try {
-      const { supportedNuts, v0, v1, pubkey, name: mintName } = await getMintInfo(mintUrl);
+      const { supportedNuts, v0, v1, pubkey, name: mintName } = await getMintInfo(mintUrl).then((res) => res).catch(() => {
+        setIsProcessing(false);
+        alert("Error: Could not find mint");
+        throw new Error("Could not find mint");
+      });
 
       console.log("mintInfo", supportedNuts, v0, v1, pubkey);
 
@@ -56,6 +73,7 @@ const ListMintButton = () => {
         mintUrl={mintUrl}
         setMintUrl={setMintUrl}
         type="claim"
+        isProcessing={isProcessing}
       />
     </div>
   );

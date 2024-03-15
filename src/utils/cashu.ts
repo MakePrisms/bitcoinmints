@@ -43,6 +43,10 @@ export const getMintInfo = async (mintUrl: string) => {
       const res = await fetchWithTimeout(`${mintUrl}/${endpoint}`, {}, 1000);
       const data = (await res.json()) as GetMintInfoResponse;
 
+      if (res.status !== 200) {
+        throw new Error(`Request failed with status ${res.status}`);
+      }
+
       console.log("Mint Info", data);
 
       mintInfo[version] = data ? true : false;
