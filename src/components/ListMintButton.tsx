@@ -23,6 +23,7 @@ const ListMintButton = () => {
   const handleModalClose = () => {
     setIsModalOpen(false);
     setIsProcessing(false);
+    setMintUrl("");
   };
 
   const handleMintSubmit = async () => {
@@ -46,7 +47,7 @@ const ListMintButton = () => {
 
       if (!pubkey)
         alert(
-          "Your mint does not return a pubkey from the /info endpoint. You should add one and try again."
+          "Your mint does not return a pubkey from the /info endpoint. You should add one and try again, but you can continue without it."
         );
 
       const mintInfoEvent = await nip87Info(ndk, Nip87MintTypes.Cashu, {

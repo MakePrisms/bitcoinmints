@@ -42,7 +42,7 @@ const Header = () => {
 
   const handleLogin = async () => {
     if (!window.nostr) {
-      alert("Nip07 extension not found");
+      alert("Nip07 extension not found. Get an extenstion then try again: https://github.com/aljazceru/awesome-nostr?tab=readme-ov-file#nip-07-browser-extensions");
       return;
     }
     try {

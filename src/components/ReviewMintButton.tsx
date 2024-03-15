@@ -26,6 +26,9 @@ const ReviewMintButton = ({mint, text}: {mint?: Nip87MintInfo, text: string;}) =
   const handleModalClose = () => {
     setIsModalOpen(false);
     setIsProcessing(false);
+    setMintUrl("");
+    setRating(0);
+    setReview("");
   };
 
   const handleModalSubmit = async () => {
