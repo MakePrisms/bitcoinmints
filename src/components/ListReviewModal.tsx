@@ -26,7 +26,7 @@ const ListReviewModal = ({
   setReview,
 }: ListReviewModalProps) => {
   const title = type === "review" ? "Review Mint" : "List Mint";
-  const submitText = type === "review" ? "Publish Endorsement" : "Publish Listing";
+  const submitText = type === "review" ? "Publish Review" : "Publish Listing";
   return (
     <Modal show={show} onClose={onClose} size="md" popup>
       <Modal.Header />

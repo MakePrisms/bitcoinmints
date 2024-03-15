@@ -60,7 +60,7 @@ const TableRowMint = ({ mint }: { mint: Nip87MintInfo }) => {
               />
             </Tooltip>
           ) : (
-            <ReviewMintButton mint={mint} text="Review" />
+            <ReviewMintButton mint={mint} text="Add Review" />
           )}
         </Table.Cell>
       </Table.Row>

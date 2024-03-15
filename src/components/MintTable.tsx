@@ -83,7 +83,7 @@ const MintTable = () => {
         <div className="overflow-x-auto overflow-y-auto max-h-screen">
           <Table className="w-full">
             <Table.Head className="">
-              <Table.HeadCell>Endorsed By</Table.HeadCell>
+              <Table.HeadCell>Rated By</Table.HeadCell>
               <Table.HeadCell>Mint</Table.HeadCell>
               <Table.HeadCell>Rating</Table.HeadCell>
               <Table.HeadCell>Review</Table.HeadCell>
