@@ -74,7 +74,13 @@ const ReviewMintButton = ({mint, text}: {mint?: Nip87MintInfo, text: string;}) =
 
   return (
     <div>
-      <Button className="" onClick={() => setIsModalOpen(true)}>{text}</Button>
+      {
+        user.pubkey ? (
+          <Button onClick={() => setIsModalOpen(true)}>{text}</Button>
+        ) : (
+          <Button onClick={() => alert("You must be logged in to review a mint")}>{text}</Button>
+        )
+      }
       <ListReviewModal
         show={isModalOpen}
         onClose={handleModalClose}

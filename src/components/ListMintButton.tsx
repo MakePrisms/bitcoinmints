@@ -15,6 +15,7 @@ const ListMintButton = () => {
   const [isProcessing, setIsProcessing] = useState(false);
 
   const mints = useSelector((state: RootState) => state.nip87.mints);
+  const user = useSelector((state: RootState) => state.user);
 
   const { ndk } = useNdk();
 
@@ -35,13 +36,21 @@ const ListMintButton = () => {
     }
 
     setIsProcessing(true);
-    
+
     try {
-      const { supportedNuts, v0, v1, pubkey, name: mintName } = await getMintInfo(mintUrl).then((res) => res).catch(() => {
-        setIsProcessing(false);
-        alert("Error: Could not find mint");
-        throw new Error("Could not find mint");
-      });
+      const {
+        supportedNuts,
+        v0,
+        v1,
+        pubkey,
+        name: mintName,
+      } = await getMintInfo(mintUrl)
+        .then((res) => res)
+        .catch(() => {
+          setIsProcessing(false);
+          alert("Error: Could not find mint");
+          throw new Error("Could not find mint");
+        });
 
       console.log("mintInfo", supportedNuts, v0, v1, pubkey);
 
@@ -66,7 +75,13 @@ const ListMintButton = () => {
   };
   return (
     <div>
-      <Button onClick={() => setIsModalOpen(true)}>List a Mint</Button>
+      {user.pubkey ? (
+        <Button onClick={() => setIsModalOpen(true)}>List a Mint</Button>
+      ) : (
+        <Button onClick={() => alert("You must be logged in to review a mint")}>
+          List a Mint
+        </Button>
+      )}
       <ListReviewModal
         show={isModalOpen}
         onClose={handleModalClose}
