@@ -4,8 +4,9 @@ import {
   Nip87MintReccomendation,
   Nip87MintTypes,
 } from "@/types";
+import { getMintInfo } from "@/utils/cashu";
 import { NostrEvent } from "@nostr-dev-kit/ndk";
-import { createSlice } from "@reduxjs/toolkit";
+import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 
 interface Nip87State {
   mints: Nip87MintInfo[];
@@ -21,11 +22,39 @@ const initialState: Nip87State = {
   error: null,
 };
 
+export const addMintAsync = createAsyncThunk(
+  'nip87/addMint',
+  async ({ event, relay }: { event: NostrEvent; relay?: string }, { dispatch }) => {
+    const mintUrls = event.tags.filter((tag) => tag[0] === "u").map((tag) => tag[1]);
+
+    if (mintUrls.length > 1) throw new Error("Multiple mint urls in one mint info event");
+
+    const {name: mintName}= await getMintInfo(mintUrls[0]).catch(() => ({name: "Unknown"}));
+
+    dispatch(addMint({ event, relay, mintName }));
+  })
+
+export const addMintEndorsementAsync = createAsyncThunk(
+  'nip87/addMintEndorsement',
+  async ({ event, infoEventRelay }: { event: NostrEvent; infoEventRelay?: string }, { dispatch }) => {
+    const mintUrls = event.tags.filter((tag) => tag[0] === "u" && tag[2] === "cashu").map((tag) => tag[1]);
+
+    const mintNameMap = [];
+    for (const mintUrl of mintUrls) {
+      const {name: mintName} = await getMintInfo(mintUrl).catch(() => ({name: "Unknown"}));
+      mintNameMap.push({mintUrl, mintName});
+    }
+
+    dispatch(addMintEndorsement({ event, infoEventRelay, mintNameMap }));
+  }
+
+)
+
 const nip87Slice = createSlice({
   name: "nip87",
   initialState: initialState,
   reducers: {
-    addMint(state, action: { payload: { event: NostrEvent; relay?: string } }) {
+    addMint(state, action: { payload: { event: NostrEvent; relay?: string, mintName: string  } }) {
       const mintUrls = action.payload.event.tags
         .filter((tag) => tag[0] === "u")
         .map((tag) => tag[1]);
@@ -44,6 +73,7 @@ const nip87Slice = createSlice({
             ...state.mints,
             {
               mintUrl,
+              mintName: action.payload.mintName,
               appPubkey: action.payload.event.pubkey,
               rawEvent: action.payload.event,
               supportedNuts: action.payload.event.tags.find(t => t[0] === "nuts")?.[1],
@@ -55,7 +85,7 @@ const nip87Slice = createSlice({
     },
     addMintEndorsement(
       state,
-      action: { payload: { event: NostrEvent; infoEventRelay?: string } }
+      action: { payload: { event: NostrEvent; mintNameMap: {mintUrl: string; mintName: string;}[], infoEventRelay?: string } }
     ) {
       if (action.payload.event.kind !== Nip87Kinds.Reccomendation) return;
 
@@ -75,12 +105,15 @@ const nip87Slice = createSlice({
             `${mintUrl}${action.payload.event.pubkey}`
         );
 
+        const mintName = action.payload.mintNameMap.find(m => m.mintUrl === mintUrl)?.mintName!;
+
         if (!exists) {
           state.endorsements = [
             ...state.endorsements,
             {
               mintType: Nip87MintTypes.Cashu,
               mintUrl,
+              mintName,
               rating: rating ? parseInt(rating) : undefined,
               review,
               userPubkey: action.payload.event.pubkey,

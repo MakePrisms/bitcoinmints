@@ -5,7 +5,7 @@ import NDK, { NDKEvent, NDKFilter } from "@nostr-dev-kit/ndk";
 import { useNdk } from "@/hooks/useNdk";
 import { Nip87Kinds } from "@/types";
 import { RootState, useAppDispatch } from "@/redux/store";
-import { addMint, addMintEndorsement } from "@/redux/slices/nip87Slice";
+import { addMintAsync, addMintEndorsementAsync } from "@/redux/slices/nip87Slice";
 import NostrProfile from "@/components/NostrProfile";
 import TableRowMint from "./TableRowMint";
 import TableRowEndorsement from "./TableRowEndorsement";
@@ -33,12 +33,12 @@ const MintTable = () => {
     );
 
     mintSub.on("event", (event: NDKEvent) => {
-      dispatch(addMint({ event: event.rawEvent(), relay: event.relay!.url }));
+      dispatch(addMintAsync({ event: event.rawEvent(), relay: event.relay!.url }))
     });
 
     endorsementSub.on("event", (event: NDKEvent) => {
       dispatch(
-        addMintEndorsement({
+        addMintEndorsementAsync({
           event: event.rawEvent(),
           infoEventRelay: undefined,
         })
@@ -61,7 +61,8 @@ const MintTable = () => {
       <div className="overflow-x-auto overflow-y-auto max-h-screen">
         <Table className="overflow-x-auto">
           <Table.Head>
-            <Table.HeadCell>Mint URL</Table.HeadCell>
+            <Table.HeadCell>Mint</Table.HeadCell>
+            <Table.HeadCell>URL</Table.HeadCell>
             <Table.HeadCell>Supported Nuts</Table.HeadCell>
             <Table.HeadCell>
               <span className="sr-only">Review</span>
@@ -83,7 +84,7 @@ const MintTable = () => {
           <Table className="w-full">
             <Table.Head className="">
               <Table.HeadCell>Endorsed By</Table.HeadCell>
-              <Table.HeadCell>Mint URL</Table.HeadCell>
+              <Table.HeadCell>Mint</Table.HeadCell>
               <Table.HeadCell>Rating</Table.HeadCell>
               <Table.HeadCell>Review</Table.HeadCell>
               <Table.HeadCell>

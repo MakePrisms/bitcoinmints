@@ -23,7 +23,7 @@ const ListMintButton = () => {
   const handleMintSubmit = async () => {
     console.log("mintUrl", mintUrl);
     try {
-      const { supportedNuts, v0, v1, pubkey } = await getMintInfo(mintUrl);
+      const { supportedNuts, v0, v1, pubkey, name: mintName } = await getMintInfo(mintUrl);
 
       console.log("mintInfo", supportedNuts, v0, v1, pubkey);
 
@@ -40,7 +40,7 @@ const ListMintButton = () => {
 
       console.log("mintInfoEvent", mintInfoEvent.rawEvent());
       await mintInfoEvent.publish();
-      dispatch(addMint({ event: mintInfoEvent.rawEvent() }));
+      dispatch(addMint({ event: mintInfoEvent.rawEvent(), mintName }));
       handleModalClose();
     } catch (e) {
       console.error(e);

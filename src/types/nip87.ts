@@ -15,6 +15,7 @@ export type Nip87MintInfo = {
   mintUrl: string;
   appPubkey: string;
   rawEvent: NostrEvent;
+  mintName: string;
   relay?: string;
   mintPubkey?: string;
   supportedNuts?: string;
@@ -30,6 +31,7 @@ export type Nip87MintReccomendation = {
   mintUrl: string;
   userPubkey: string;
   rawEvent: NostrEvent;
+  mintName: string;
   mintInfoEventRelay?: string;
   mintPubkey?: string;
   review?: string;
@@ -39,6 +41,7 @@ export type Nip87MintReccomendation = {
 export type Nip87ReccomendationData = {
   mintUrl: string;
   supportedNuts: string;
+  mintName: string;
   mintPubkey?: string;
 
 }

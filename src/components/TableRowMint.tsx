@@ -41,11 +41,7 @@ const TableRowMint = ({ mint }: { mint: Nip87MintInfo }) => {
   return (
     <>
       <Table.Row className="dark:bg-gray-800">
-        <Table.Cell
-          className="hover:cursor-pointer"
-          onClick={() => copyToClipboard(mint.mintUrl)}
-        >
-          <Tooltip content="click to copy">
+        <Table.Cell>{mint.mintName}</Table.Cell>
             {shortenString(mint.mintUrl)}
           </Tooltip>
         </Table.Cell>

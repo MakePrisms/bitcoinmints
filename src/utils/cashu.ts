@@ -1,4 +1,4 @@
-import { GetMintInfoResponse } from "@/types";
+import { GetMintInfoResponse, V0NutData, V1NutData } from "@/types";
 
 const timeout = (ms: number) => {
   return new Promise((resolve, reject) => {
@@ -24,11 +24,13 @@ export const getMintInfo = async (mintUrl: string) => {
     v0: boolean;
     v1: boolean;
     supportedNuts: string;
+    name: string;
     pubkey?: string;
   } = {
     v0: false,
     v1: false,
     supportedNuts: "",
+    name: "",
   };
 
   let nutSet = new Set<number>();
@@ -47,16 +49,17 @@ export const getMintInfo = async (mintUrl: string) => {
 
       let nutNums: number[] = [];
       if (version === "v0") {
-        nutNums = data.nuts.map((str) => parseInt(str.split("-")[1], 10));
+        const nuts = data.nuts as V0NutData;
+        nutNums = nuts.map((str) => parseInt(str.split("-")[1], 10));
+        mintInfo.name = data.name;
       } else {
-        const nuts = data.nuts as unknown as {
-          [key: string]: { supported?: boolean };
-        };
+        const nuts = data.nuts as V1NutData;
         nutNums = Object.keys(nuts)
           .filter((nutNum) => Number(nutNum) > 6 && nuts[nutNum].supported)
           .map(Number);
+
+        mintInfo.name = data.name || mintInfo.name;
       }
-      console.log("NUT NUMS", nutNums);
       nutNums.forEach((num) => nutSet.add(num));
       data.pubkey && (mintInfo.pubkey = data.pubkey);
     } catch (e) {
@@ -71,7 +74,9 @@ export const getMintInfo = async (mintUrl: string) => {
     throw new Error(`Mint url ${mintUrl} is offline or invalid.`);
   }
 
-  mintInfo.supportedNuts =Array.from(nutSet).sort((a,b) => a-b).join(",");
+  mintInfo.supportedNuts = Array.from(nutSet)
+    .sort((a, b) => a - b)
+    .join(",");
 
   return mintInfo;
 };

@@ -27,15 +27,15 @@ const ReviewMintButton = ({mint, text}: {mint?: Nip87MintInfo, text: string;}) =
     if (mint) {
       mintToEndorse = mint;
     } else {
-      const { supportedNuts, v0, v1, pubkey } = await getMintInfo(mintUrl);
+      const { supportedNuts, v0, v1, pubkey, name: mintName } = await getMintInfo(mintUrl);
 
       console.log("mintInfo", supportedNuts, v0, v1, pubkey)
       
-      mintToEndorse = { mintUrl, supportedNuts };
+      mintToEndorse = { mintUrl, supportedNuts, mintName };
     }
     const endorsement = await nip87Reccomendation(ndk, mintToEndorse, rating, review);
     console.log("endorsement", endorsement.rawEvent());
-    dispatch(addMintEndorsement({ event: endorsement.rawEvent()}))
+    dispatch(addMintEndorsement({ event: endorsement.rawEvent(), mintNameMap: [{mintUrl, mintName: mintToEndorse.mintName}]}))
     await endorsement.publish();
     handleModalClose();
   };
