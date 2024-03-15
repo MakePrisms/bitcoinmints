@@ -62,10 +62,9 @@ const Header = () => {
   return (
     <Navbar
       fluid
-      rounded
-      className="bg-gray-800 flex justify-around align-middle items-center"
+      className="bg-gradient-to-tr from-gray-800 to-gray-700 flex justify-around align-middle items-center"
     >
-      <Navbar.Brand className="md:ml-6 w-2/3 md:w-1/3">
+      <Navbar.Brand className="md:ml-6 w-2/3 md:w-1/3 md:my-1 lg:w-1/4">
         <img src="/bitcoinmintslogo.png" alt="" />
       </Navbar.Brand>
       <div className="flex justify-end md:order-2 md:mr-6">

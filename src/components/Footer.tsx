@@ -46,9 +46,9 @@ const CustomTwitter: React.FC = () => (
 
 const Footer = () => {
   return (
-    <FlowbiteFooter container>
+    <FlowbiteFooter container className="bg-gradient-to-r from-gray-900 to-gray-800 rounded-none">
       <div className="w-full text-center">
-        <div className="w-full md:justify-around flex md:flex-row flex-col sm:items-center justify-between">
+        <div className="w-full md:justify-around flex md:flex-row flex-col sm:items-center justify-between ">
           <div>
             <a
               href="https://www.makeprisms.com"
