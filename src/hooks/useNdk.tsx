@@ -20,15 +20,13 @@ const NDKContext = createContext<NDKContextProps>({
 });
 
 const defaultRelays = [
-  // "wss://relay.getalby.com/v1",
-  // "wss://nostr.mutinywallet.com/",
-  // "wss://relay.mutinywallet.com",
-  // "wss://relay.damus.io",
-  // "wss://relay.snort.social",
+  "wss://nostr.mutinywallet.com/",
+  "wss://relay.damus.io",
+  "wss://relay.snort.social",
   "wss://relay.primal.net",
-  "wss://nostr.drss.io",
-  "wss://nostr.lorentz.is",
-  "wss://nostr.stakey.net",
+  "wss://bitcoiner.social",
+  "wss://relay.satoshidnc.com",
+  "wss://nos.lol"
 ];
 
 export const NDKProvider = ({ children }: any) => {
