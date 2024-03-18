@@ -2,6 +2,7 @@ import { useNdk } from "@/hooks/useNdk";
 import { NDKUserProfile } from "@nostr-dev-kit/ndk";
 import { Avatar } from "flowbite-react";
 import { useEffect, useState } from "react";
+import { nip19 } from "nostr-tools"
 
 const NostrProfile = ({ pubkey }: { pubkey: string }) => {
   const { fetchUserProfile } = useNdk();
@@ -18,7 +19,7 @@ const NostrProfile = ({ pubkey }: { pubkey: string }) => {
 
   return (
     <a
-      href={profile.npub ? `https://njump.me/${profile.npub}` : undefined}
+      href={`https://njump.me/${nip19.npubEncode(pubkey)}`}
       target="_blank"
     >
       <div className="flex flex-col items-start">
