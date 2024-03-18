@@ -2,10 +2,14 @@ import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 
 interface UserState {
   pubkey: string;
+  image: string;
+  name: string;
 }
 
 const initialState: UserState = {
   pubkey: '',
+  image: '',
+  name: '',
 };
 
 export const userSlice = createSlice({
@@ -14,6 +18,8 @@ export const userSlice = createSlice({
   reducers: {
     setUser: (state, action: PayloadAction<UserState>) => {
       state.pubkey = action.payload.pubkey;
+      state.image = action.payload.image;
+      state.name = action.payload.name;
     },
   },
 });
