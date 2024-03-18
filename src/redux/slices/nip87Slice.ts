@@ -93,8 +93,8 @@ const nip87Slice = createSlice({
         .filter((tag) => tag[0] === "u" && tag[2] === "cashu")
         .map((tag) => tag[1]);
 
-      const rating = action.payload.event.tags.find((tag) => tag[0] === "rating")?.[1];
-      const review = action.payload.event.tags.find((tag) => tag[0] === "review")?.[1];
+      const rating = action.payload.event.content.match(/\[(\d)\/5\]/)?.[1];
+      const review = action.payload.event.content.replace(/\[(\d)\/5\]/, "");
 
       if (mintUrls.length === 0) return;
 

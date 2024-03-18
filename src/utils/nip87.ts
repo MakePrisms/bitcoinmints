@@ -59,28 +59,38 @@ export const nip87Reccomendation = async (
   rating?: number,
   review?: string
 ): Promise<NDKEvent> => {
-  let tags: NDKTag[] = [["u", mint.mintUrl, "cashu"]];
-  if (isNip87MintInfo(mint) && mint.mintPubkey && mint.relay) {
+  let tags: NDKTag[] = [
+    ["k", Nip87Kinds.CashuInfo.toString()],
+    ["u", mint.mintUrl, "cashu"],
+  ];
+
+  if (isNip87MintInfo(mint)) {
+    const identifier = mint.rawEvent.tags.find((tag) => tag[0] === "d")?.[1] || mint.mintPubkey;
+    if (!identifier) {
+      throw new Error("Mint info event must have a mintPubkey or d tag");
+    }
     const aTag = [
       "a",
-      `${Nip87Kinds.CashuInfo}:cashu-mint-pubkey:${mint.mintPubkey}`,
-      mint.relay,
+      `${Nip87Kinds.CashuInfo}:cashu-mint-pubkey:${identifier}`,
+      mint.relay || "",
       "cashu",
     ];
+    const dTag = ["d", identifier];
     tags.push(aTag);
+    tags.push(dTag);
   }
 
+  let content = "";
   if (rating) {
-    tags.push(["rating", rating.toString()]);
+    content += `[${rating}/5] `;
   }
-
   if (review) {
-    tags.push(["review", review]);
+    content += review;
   }
 
   const event = new NDKEvent(ndk, {
     kind: Nip87Kinds.Reccomendation,
-    content: "",
+    content,
     tags: tags,
   } as NostrEvent);
 

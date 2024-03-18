@@ -1,7 +1,7 @@
 import { NDKUserProfile, NostrEvent } from "@nostr-dev-kit/ndk";
 
 export enum Nip87Kinds {
-  Reccomendation = 18173,
+  Reccomendation = 38000,
   CashuInfo = 38172,
   FediInfo = 38173,
 }
@@ -23,7 +23,7 @@ export type Nip87MintInfo = {
 };
 
 export function isNip87MintInfo(mint: Nip87MintInfo | Nip87ReccomendationData): mint is Nip87MintInfo {
-  return (mint as Nip87MintInfo).appPubkey !== undefined && Object.keys(mint).length <= 3;
+  return (mint as Nip87MintInfo).appPubkey !== undefined;
 } 
 
 export type Nip87MintReccomendation = {
@@ -43,5 +43,4 @@ export type Nip87ReccomendationData = {
   supportedNuts: string;
   mintName: string;
   mintPubkey?: string;
-
 }
