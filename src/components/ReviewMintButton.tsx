@@ -84,8 +84,8 @@ const ReviewMintButton = ({mint, text}: {mint?: Nip87MintInfo, text: string;}) =
       <ListReviewModal
         show={isModalOpen}
         onClose={handleModalClose}
-        mintUrl={mintUrl}
-        setMintUrl={setMintUrl}
+        mintUrl={mint?.mintUrl ? mint?.mintUrl : mintUrl}
+        setMintUrl={mint?.mintUrl ? () => {} : setMintUrl}
         handleSubmit={handleModalSubmit}
         type="review"
         rating={rating}
