@@ -5,7 +5,7 @@ import NDK, { NDKEvent, NDKFilter } from "@nostr-dev-kit/ndk";
 import { useNdk } from "@/hooks/useNdk";
 import { Nip87Kinds } from "@/types";
 import { RootState, useAppDispatch } from "@/redux/store";
-import { addMintAsync, addMintEndorsementAsync } from "@/redux/slices/nip87Slice";
+import { addMintInfosAsync, addMintEndorsementAsync } from "@/redux/slices/nip87Slice";
 import NostrProfile from "@/components/NostrProfile";
 import TableRowMint from "./TableRowMint";
 import TableRowEndorsement from "./TableRowEndorsement";
@@ -33,7 +33,7 @@ const MintTable = () => {
     );
 
     mintSub.on("event", (event: NDKEvent) => {
-      dispatch(addMintAsync({ event: event.rawEvent(), relay: event.relay!.url }))
+      dispatch(addMintInfosAsync({ event: event.rawEvent(), relay: event.relay!.url }))
     });
 
     endorsementSub.on("event", (event: NDKEvent) => {
@@ -46,14 +46,14 @@ const MintTable = () => {
     });
   }, [ndk, dispatch]);
 
-  const { mints, endorsements } = useSelector(
+  const { mintInfos, endorsements } = useSelector(
     (state: RootState) => state.nip87
   );
 
   useEffect(() => {
-    console.log("mints", mints);
+    console.log("mints", mintInfos);
     console.log("endorsements", endorsements);
-  }, [mints, endorsements]);
+  }, [mintInfos, endorsements]);
 
   return (
     <Tabs className="w-full" style="fullWidth">
@@ -69,7 +69,7 @@ const MintTable = () => {
             </Table.HeadCell>
           </Table.Head>
           <Table.Body>
-            {mints.map((mint, idx) => (
+            {mintInfos.map((mint, idx) => (
               <TableRowMint mint={mint} key={idx} />
             ))}
           </Table.Body>

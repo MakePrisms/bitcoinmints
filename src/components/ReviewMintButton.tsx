@@ -6,7 +6,7 @@ import ListReviewModal from "./ListReviewModal";
 import { Nip87MintInfo, Nip87ReccomendationData } from "@/types";
 import { nip87Reccomendation } from "@/utils/nip87";
 import { useDispatch, useSelector } from "react-redux";
-import { addMintEndorsement } from "@/redux/slices/nip87Slice";
+import { addMintData, addMintEndorsement } from "@/redux/slices/nip87Slice";
 import { RootState } from "@/redux/store";
 
 const ReviewMintButton = ({mint, text}: {mint?: Nip87MintInfo, text: string;}) => {
@@ -17,6 +17,7 @@ const ReviewMintButton = ({mint, text}: {mint?: Nip87MintInfo, text: string;}) =
   const [isProcessing, setIsProcessing] = useState(false);
 
   const reviews = useSelector((state: RootState) => state.nip87.endorsements);
+  const mintData = useSelector((state: RootState) => state.nip87.mints);
   const user = useSelector((state: RootState) => state.user);
 
   const dispatch = useDispatch();
@@ -44,15 +45,18 @@ const ReviewMintButton = ({mint, text}: {mint?: Nip87MintInfo, text: string;}) =
     let mintToEndorse: Nip87MintInfo | Nip87ReccomendationData;
     if (mint) {
       mintToEndorse = mint;
+    } else if (mintData.find((mint) => mint.url === mintUrl)) {
+      const {supportedNuts, name: mintName} = mintData.find((mint) => mint.url === mintUrl)!;
+      mintToEndorse = {mintUrl, supportedNuts, mintName};
     } else {
-      const { supportedNuts, v0, v1, pubkey, name: mintName } = await getMintInfo(mintUrl).then((res) => res).catch(() => {
+      const mintData = await getMintInfo(mintUrl).then((res) => res).catch(() => {
         setIsProcessing(false);
         alert("Error: Could not find mint");
         throw new Error("Could not find mint");
       });
+      dispatch(addMintData(mintData));
+      const {supportedNuts, name: mintName} = mintData;
 
-      console.log("mintInfo", supportedNuts, v0, v1, pubkey)
-      
       mintToEndorse = { mintUrl, supportedNuts, mintName };
     }
 
@@ -61,15 +65,6 @@ const ReviewMintButton = ({mint, text}: {mint?: Nip87MintInfo, text: string;}) =
     dispatch(addMintEndorsement({ event: endorsement.rawEvent(), mintNameMap: [{mintUrl, mintName: mintToEndorse.mintName}]}))
     await endorsement.publish();
     handleModalClose();
-  };
-
-  const handleSubmit = async () => {
-    try {
-      const { supportedNuts, v0, v1 } = await getMintInfo(mintUrl);
-      handleModalClose();
-    } catch (e) {
-      console.error(e);
-    }
   };
 
   return (

@@ -4,9 +4,9 @@ import { Button } from "flowbite-react";
 import ListReviewModal from "./ListReviewModal";
 import { nip87Info } from "@/utils/nip87";
 import { useNdk } from "@/hooks/useNdk";
-import { Nip87MintTypes } from "@/types";
+import { MintData, Nip87MintTypes } from "@/types";
 import { useDispatch, useSelector } from "react-redux";
-import { addMint } from "@/redux/slices/nip87Slice";
+import { addMint, addMintData } from "@/redux/slices/nip87Slice";
 import { RootState } from "@/redux/store";
 
 const ListMintButton = () => {
@@ -14,7 +14,8 @@ const ListMintButton = () => {
   const [mintUrl, setMintUrl] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
 
-  const mints = useSelector((state: RootState) => state.nip87.mints);
+  const mints = useSelector((state: RootState) => state.nip87.mintInfos);
+  const mintData = useSelector((state: RootState) => state.nip87.mints);
   const user = useSelector((state: RootState) => state.user);
 
   const { ndk } = useNdk();
@@ -38,21 +39,26 @@ const ListMintButton = () => {
     setIsProcessing(true);
 
     try {
-      const {
-        supportedNuts,
-        v0,
-        v1,
-        pubkey,
-        name: mintName,
-      } = await getMintInfo(mintUrl)
+      let mintToList: MintData;
+      if (mintData.find((mint) => mint.url === mintUrl)) {
+        mintToList = mintData.find((mint) => mint.url === mintUrl)!;
+      } else {
+        mintToList = await getMintInfo(mintUrl)
         .then((res) => res)
         .catch(() => {
           setIsProcessing(false);
           alert("Error: Could not find mint");
           throw new Error("Could not find mint");
         });
-
-      console.log("mintInfo", supportedNuts, v0, v1, pubkey);
+        dispatch(addMintData(mintToList));
+      }
+      const {
+        supportedNuts,
+        v0,
+        v1,
+        pubkey,
+        name: mintName,
+      } = mintToList;
 
       if (!pubkey)
         alert(

@@ -1,4 +1,10 @@
-import { Nip87Kinds, Nip87MintInfo, Nip87MintTypes, Nip87ReccomendationData, isNip87MintInfo } from "@/types";
+import {
+  Nip87Kinds,
+  Nip87MintInfo,
+  Nip87MintTypes,
+  Nip87ReccomendationData,
+  isNip87MintInfo,
+} from "@/types";
 import NDK, {
   NDKEvent,
   NDKTag,
@@ -24,9 +30,10 @@ export const nip87Info = async (
 
   const content = kind0Metadata ? JSON.stringify(kind0Metadata) : "";
 
-  console.log("MINT PUBKEY", mintPubkey);
-
-  const tags: NDKTag[] = [["u", mintUrl], ["nuts", supportedNuts]];
+  const tags: NDKTag[] = [
+    ["u", mintUrl],
+    ["nuts", supportedNuts],
+  ];
   mintPubkey && tags.push(["d", mintPubkey]);
   console.log("TAGS", tags);
 

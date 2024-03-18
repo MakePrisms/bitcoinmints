@@ -6,3 +6,12 @@ export type GetMintInfoResponse = {
   pubkey: string;
   name: string;
 }
+
+export type MintData = {
+  url: string;
+  v0: boolean;
+  v1: boolean;
+  supportedNuts: string;
+  name: string;
+  pubkey?: string;
+}

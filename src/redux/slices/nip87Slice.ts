@@ -1,4 +1,5 @@
 import {
+  MintData,
   Nip87Kinds,
   Nip87MintInfo,
   Nip87MintReccomendation,
@@ -7,9 +8,11 @@ import {
 import { getMintInfo } from "@/utils/cashu";
 import { NostrEvent } from "@nostr-dev-kit/ndk";
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
+import { RootState } from "../store";
 
 interface Nip87State {
-  mints: Nip87MintInfo[];
+  mints: MintData[];
+  mintInfos: Nip87MintInfo[];
   endorsements: Nip87MintReccomendation[];
   loading: boolean;
   error?: null | string;
@@ -17,31 +20,57 @@ interface Nip87State {
 
 const initialState: Nip87State = {
   mints: [],
+  mintInfos: [],
   endorsements: [],
   loading: false,
   error: null,
 };
 
-export const addMintAsync = createAsyncThunk(
+export const addMintInfosAsync = createAsyncThunk(
   'nip87/addMint',
-  async ({ event, relay }: { event: NostrEvent; relay?: string }, { dispatch }) => {
+  async ({ event, relay }: { event: NostrEvent; relay?: string }, {getState, dispatch }) => {
     const mintUrls = event.tags.filter((tag) => tag[0] === "u").map((tag) => tag[1]);
 
     if (mintUrls.length > 1) throw new Error("Multiple mint urls in one mint info event");
 
-    const {name: mintName}= await getMintInfo(mintUrls[0]).catch(() => ({name: "Unknown"}));
+    const state = getState() as RootState;
+    const fetchedMint = state.nip87.mints.find((mint) => mint.url === mintUrls[0]);
+
+    let mintName = "";
+    if (fetchedMint) {
+      mintName = fetchedMint.name;
+    } else {
+      const mintData = await getMintInfo(mintUrls[0])
+      const {name} = mintData;
+      dispatch(addMintData(mintData));
+      mintName = name;
+    }
+
 
     dispatch(addMint({ event, relay, mintName }));
   })
 
 export const addMintEndorsementAsync = createAsyncThunk(
   'nip87/addMintEndorsement',
-  async ({ event, infoEventRelay }: { event: NostrEvent; infoEventRelay?: string }, { dispatch }) => {
+  async ({ event, infoEventRelay }: { event: NostrEvent; infoEventRelay?: string }, {getState, dispatch }) => {
     const mintUrls = event.tags.filter((tag) => tag[0] === "u" && tag[2] === "cashu").map((tag) => tag[1]);
+
+    const state = getState() as RootState;
+    const fetchedMints = state.nip87.mints.filter((mint) => mintUrls.includes(mint.url));
 
     const mintNameMap = [];
     for (const mintUrl of mintUrls) {
-      const {name: mintName} = await getMintInfo(mintUrl).catch(() => ({name: "Unknown"}));
+      const fetchedMint = fetchedMints.find((mint) => mint.url === mintUrl); 
+      let mintName = "";
+      if (fetchedMint) {
+        mintName = fetchedMint.name;
+      } else {
+        const mintData = await getMintInfo(mintUrls[0])
+        const {name} = mintData;
+        dispatch(addMintData(mintData));
+        mintName = name;
+      }
+      
       mintNameMap.push({mintUrl, mintName});
     }
 
@@ -54,6 +83,10 @@ const nip87Slice = createSlice({
   name: "nip87",
   initialState: initialState,
   reducers: {
+    addMintData(state, action: { payload: MintData }) {
+      if (state.mints.find((mint) => mint.url === action.payload.url)) return;
+      state.mints = [...state.mints, action.payload];
+    },
     addMint(state, action: { payload: { event: NostrEvent; relay?: string, mintName: string  } }) {
       const mintUrls = action.payload.event.tags
         .filter((tag) => tag[0] === "u")
@@ -62,15 +95,15 @@ const nip87Slice = createSlice({
       if (mintUrls.length === 0) return;
 
       mintUrls.forEach((mintUrl) => {
-        const exists = state.mints.find(
+        const exists = state.mintInfos.find(
           (mint) =>
             `${mint.mintUrl}` ===
             `${mintUrl}`
         );
 
         if (!exists) {
-          state.mints = [
-            ...state.mints,
+          state.mintInfos = [
+            ...state.mintInfos,
             {
               mintUrl,
               mintName: action.payload.mintName,
@@ -131,7 +164,7 @@ const nip87Slice = createSlice({
       );
     },
     deleteMintInfo(state, action: { payload: string }) {
-      state.mints = state.mints.filter(
+      state.mintInfos = state.mintInfos.filter(
         (mint) => `${mint.mintUrl}${mint.appPubkey}` !== action.payload
       );
     },
@@ -140,6 +173,7 @@ const nip87Slice = createSlice({
 
 export default nip87Slice.reducer;
 export const {
+  addMintData,
   addMint,
   addMintEndorsement,
   deleteMintEndorsement,
