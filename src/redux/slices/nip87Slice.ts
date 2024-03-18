@@ -70,7 +70,7 @@ export const addMintEndorsementAsync = createAsyncThunk(
         dispatch(addMintData(mintData));
         mintName = name;
       }
-      
+
       mintNameMap.push({mintUrl, mintName});
     }
 
@@ -111,6 +111,9 @@ const nip87Slice = createSlice({
               rawEvent: action.payload.event,
               supportedNuts: action.payload.event.tags.find(t => t[0] === "nuts")?.[1],
               relay: action.payload.relay,
+              numRecommendations: state.endorsements.filter(e => e.mintUrl === mintUrl).length,
+              totalRatings: state.endorsements.filter(e => e.mintUrl === mintUrl).reduce((acc, e) => acc + (e.rating || 0), 0),
+              numRecsWithRatings: state.endorsements.filter(e => e.mintUrl === mintUrl).filter(e => e.rating).length,
             },
           ];
         }
@@ -154,6 +157,15 @@ const nip87Slice = createSlice({
               mintInfoEventRelay: action.payload.infoEventRelay,
             },
           ];
+          // update the mint info with new review data
+          const mintInfo = state.mintInfos.find(m => m.mintUrl === mintUrl);
+          if (mintInfo) {
+            mintInfo.numRecommendations = mintInfo.numRecommendations + 1;
+            mintInfo.totalRatings = mintInfo.totalRatings + (rating ? parseInt(rating) : 0);
+            mintInfo.numRecsWithRatings = mintInfo.numRecsWithRatings + (rating ? 1 : 0);
+            // update the mint info in the state
+            state.mintInfos = state.mintInfos.map(m => m.mintUrl === mintUrl ? mintInfo : m);
+          }
         }
       });
     },
@@ -162,6 +174,13 @@ const nip87Slice = createSlice({
         (endorsement) =>
           `${endorsement.mintUrl}${endorsement.userPubkey}` !== action.payload
       );
+      const mintInfo = state.mintInfos.find(m => m.mintUrl === action.payload);
+      if (mintInfo) {
+        mintInfo.numRecommendations = mintInfo.numRecommendations - 1;
+        //TODO: decrement totalRatings and numRecsWithRatings
+        // update the mint info in the state
+        state.mintInfos = state.mintInfos.map(m => m.mintUrl === action.payload ? mintInfo : m);
+      }
     },
     deleteMintInfo(state, action: { payload: string }) {
       state.mintInfos = state.mintInfos.filter(

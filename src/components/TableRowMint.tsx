@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Button, Table, Tooltip } from "flowbite-react";
+import { Rating, Table, Tooltip } from "flowbite-react";
 import { BsClipboard2, BsClipboard2CheckFill, BsTrash } from "react-icons/bs";
 import { Nip87MintInfo } from "@/types";
 import { useNdk } from "@/hooks/useNdk";
@@ -39,7 +39,24 @@ const TableRowMint = ({ mint }: { mint: Nip87MintInfo }) => {
   return (
     <>
       <Table.Row className="dark:bg-gray-800">
+        {/* Mint name */}
         <Table.Cell>{mint.mintName}</Table.Cell>
+
+        {/* Average Rating */}
+        <Table.Cell>
+          {mint.totalRatings ? (
+            <Rating>
+              <Rating.Star />
+              &nbsp;{mint.totalRatings / mint.numRecsWithRatings || "N/A"}
+              &nbsp;&middot;&nbsp;
+              {mint.numRecsWithRatings} review{mint.numRecsWithRatings > 1 ? "s" : ""}
+            </Rating>
+          ) : (
+            "N/A"
+          )}
+        </Table.Cell>
+
+        {/*  Mint Url */}
         <Table.Cell className="hover:cursor-pointer" onClick={handleCopy}>
           <div className="flex">
             {shortenString(mint.mintUrl)}
