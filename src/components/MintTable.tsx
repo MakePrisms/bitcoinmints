@@ -125,7 +125,7 @@ const MintTable = () => {
       <Tabs style="fullWidth">
         <Tabs.Item title="Mints">
           <Filters {...filterProps}/>
-          <div className="overflow-x-auto max-h-screen">
+          <div className="overflow-x-auto">
             <Table className="overflow-x-auto">
               <Table.Head>
                 <Table.HeadCell>Mint</Table.HeadCell>
@@ -163,7 +163,7 @@ const MintTable = () => {
           className="focus:shadow-none focus:border-transparent"
         >
           <Filters {...filterProps}/>
-          <div className="overflow-x-auto max-h-screen">
+          <div className="overflow-x-auto">
             <Table className="w-full">
               <Table.Head className="">
                 <Table.HeadCell>Rated By</Table.HeadCell>
