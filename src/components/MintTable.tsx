@@ -5,13 +5,21 @@ import NDK, { NDKEvent, NDKFilter } from "@nostr-dev-kit/ndk";
 import { useNdk } from "@/hooks/useNdk";
 import { Nip87Kinds } from "@/types";
 import { RootState, useAppDispatch } from "@/redux/store";
-import { addMintInfosAsync, addMintEndorsementAsync } from "@/redux/slices/nip87Slice";
+import {
+  addMintInfosAsync,
+  addMintEndorsementAsync,
+} from "@/redux/slices/nip87Slice";
 import NostrProfile from "@/components/NostrProfile";
 import TableRowMint from "./TableRowMint";
 import TableRowEndorsement from "./TableRowEndorsement";
+import MintFilters from "./MintFilters";
+import ReviewFilters from "./ReviewFilters";
 
 const MintTable = () => {
   const dispatch = useAppDispatch();
+
+  const filters = useSelector((state: RootState) => state.filters);
+  const following = useSelector((state: RootState) => state.user.following);
 
   const { ndk } = useNdk();
 
@@ -33,7 +41,9 @@ const MintTable = () => {
     );
 
     mintSub.on("event", (event: NDKEvent) => {
-      dispatch(addMintInfosAsync({ event: event.rawEvent(), relay: event.relay!.url }))
+      dispatch(
+        addMintInfosAsync({ event: event.rawEvent(), relay: event.relay!.url })
+      );
     });
 
     endorsementSub.on("event", (event: NDKEvent) => {
@@ -58,29 +68,38 @@ const MintTable = () => {
   return (
     <Tabs className="w-full" style="fullWidth">
       <Tabs.Item title="Mints">
-      <div className="overflow-x-auto overflow-y-auto max-h-screen">
-        <Table className="overflow-x-auto">
-          <Table.Head>
-            <Table.HeadCell>Mint</Table.HeadCell>
-            <Table.HeadCell>Avg. Rating</Table.HeadCell>
-            <Table.HeadCell>URL</Table.HeadCell>
-            <Table.HeadCell>Supported Nuts</Table.HeadCell>
-            <Table.HeadCell>
-              <span className="sr-only">Review</span>
-            </Table.HeadCell>
-          </Table.Head>
-          <Table.Body>
-            {mintInfos.map((mint, idx) => (
-              <TableRowMint mint={mint} key={idx} />
-            ))}
-          </Table.Body>
-        </Table>
+        <MintFilters />
+        <div className="overflow-x-auto overflow-y-auto max-h-screen">
+          <Table className="overflow-x-auto">
+            <Table.Head>
+              <Table.HeadCell>Mint</Table.HeadCell>
+              <Table.HeadCell>Avg. Rating</Table.HeadCell>
+              <Table.HeadCell>URL</Table.HeadCell>
+              <Table.HeadCell>Supported Nuts</Table.HeadCell>
+              <Table.HeadCell>
+                <span className="sr-only">Review</span>
+              </Table.HeadCell>
+            </Table.Head>
+            <Table.Body>
+              {mintInfos.map((mint, idx) => {
+                if (mint.numRecommendations < filters.mints.minRecs)
+                  return null;
+                if (
+                  mint.totalRatings / mint.numRecsWithRatings <
+                  filters.mints.minRating
+                )
+                  return null;
+                return <TableRowMint mint={mint} key={idx} />;
+              })}
+            </Table.Body>
+          </Table>
         </div>
       </Tabs.Item>
       <Tabs.Item
         title="Reviews"
         className="focus:shadow-none focus:border-transparent"
       >
+        <ReviewFilters />
         <div className="overflow-x-auto overflow-y-auto max-h-screen">
           <Table className="w-full">
             <Table.Head className="">
@@ -93,9 +112,17 @@ const MintTable = () => {
               </Table.HeadCell>
             </Table.Head>
             <Table.Body className="divide-y">
-              {endorsements.map((endorsement, idx) => (
-                <TableRowEndorsement endorsement={endorsement} key={idx} />
-              ))}
+              {endorsements.map((endorsement, idx) => {
+                if (
+                  filters.reviews.friends &&
+                  !following?.includes(endorsement.userPubkey)
+                ) {
+                  return null;
+                }
+                return (
+                  <TableRowEndorsement endorsement={endorsement} key={idx} />
+                );
+              })}
             </Table.Body>
           </Table>
         </div>
