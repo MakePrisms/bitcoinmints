@@ -12,6 +12,8 @@ import {
 import NostrProfile from "@/components/NostrProfile";
 import TableRowMint from "./TableRowMint";
 import TableRowEndorsement from "./TableRowEndorsement";
+import MintFilters from "./MintFilters";
+import ReviewFilters from "./ReviewFilters";
 
 const MintTable = () => {
   const [mintsPage, setMintsPage] = useState(1);
@@ -19,6 +21,9 @@ const MintTable = () => {
   const dispatch = useAppDispatch();
 
   const maxPerPage = 10;
+
+  const filters = useSelector((state: RootState) => state.filters);
+  const following = useSelector((state: RootState) => state.user.following);
 
   const { ndk } = useNdk();
 

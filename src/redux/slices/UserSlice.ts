@@ -4,12 +4,14 @@ interface UserState {
   pubkey: string;
   image: string;
   name: string;
+  following?: string[];
 }
 
 const initialState: UserState = {
   pubkey: '',
   image: '',
   name: '',
+  following: [],
 };
 
 export const userSlice = createSlice({
@@ -21,9 +23,12 @@ export const userSlice = createSlice({
       state.image = action.payload.image;
       state.name = action.payload.name;
     },
+    setFollowing: (state, action: PayloadAction<string[]>) => {
+      state.following = action.payload;
+    }
   },
 });
 
-export const { setUser } = userSlice.actions;
+export const { setUser, setFollowing } = userSlice.actions;
 
 export default userSlice.reducer;

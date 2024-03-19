@@ -4,7 +4,7 @@ import { useDispatch, useSelector } from "react-redux";
 import { NDKNip07Signer } from "@nostr-dev-kit/ndk";
 import { useNdk } from "@/hooks/useNdk";
 import { RootState } from "@/redux/store";
-import { setUser } from "@/redux/slices/UserSlice";
+import { setFollowing, setUser } from "@/redux/slices/UserSlice";
 import { Avatar, Button, Dropdown, Navbar } from "flowbite-react";
 
 const Header = () => {
@@ -12,17 +12,21 @@ const Header = () => {
 
   const dipsatch = useDispatch();
 
-  const { setSigner, removeSigner, fetchUserProfile } = useNdk();
+  const { setSigner, removeSigner, fetchUserProfile, fetchFollowingPubkeys } =
+    useNdk();
 
   const user = useSelector((state: RootState) => state.user);
 
   useEffect(() => {
     if (user.pubkey) {
       setLoggedIn(true);
+      fetchFollowingPubkeys(user.pubkey)
+        .then((pubkeys) => dipsatch(setFollowing(pubkeys)))
+        .catch(() => console.error("Could not fetch following list"));
     } else {
       setLoggedIn(false);
     }
-  }, [user, fetchUserProfile]);
+  }, [user.pubkey, fetchUserProfile]);
 
   useEffect(() => {
     const userProfile = JSON.parse(
