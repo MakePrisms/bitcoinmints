@@ -7,8 +7,49 @@ import { Nip87MintReccomendation } from "@/types";
 import { RootState } from "@/redux/store";
 import { useNdk } from "@/hooks/useNdk";
 import { deleteMintEndorsement } from "@/redux/slices/nip87Slice";
-import { copyToClipboard, shortenString } from "@/utils";
-import { useState } from "react";
+import { copyToClipboard } from "@/utils";
+import { useEffect, useState } from "react";
+
+const ReviewCell = ({ review }: { review?: string }) => {
+  const [shortened, setShortened] = useState(true);
+  const [maxChars, setMaxChars] = useState(50);
+
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth < 768) {
+        setMaxChars(50);
+      } else if (window.innerWidth < 1024) {
+        setMaxChars(100);
+      } else {
+        setMaxChars(150);
+      }
+    };
+
+    window.addEventListener("resize", handleResize);
+    handleResize()
+
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  if (review && review.length > maxChars) {
+    return (
+      <>
+        <div>
+          {shortened ? review.slice(0, maxChars) + "..." : review}
+          &nbsp;
+        <span
+          className="text-blue-500 hover:cursor-pointer"
+          onClick={() => setShortened(!shortened)}
+        >
+          {shortened ? "more" : "less"}
+        </span>
+        </div>
+      </>
+    );
+  } else {
+    return <div>{review ? review : "N/A"}</div>;
+  }
+};
 
 const TableRowEndorsement = ({
   endorsement,
@@ -61,7 +102,7 @@ const TableRowEndorsement = ({
           "N/A"
         )}
       </Table.Cell>
-      <Table.Cell>{endorsement.review || "N/A"}</Table.Cell>
+      <Table.Cell className="min-w-60"><ReviewCell review={endorsement.review}/></Table.Cell>
       <Table.Cell>
         {user.pubkey === endorsement.userPubkey && (
           <Tooltip content="Attempt to delete">
