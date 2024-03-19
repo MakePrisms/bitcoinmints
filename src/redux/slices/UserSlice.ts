@@ -4,7 +4,7 @@ interface UserState {
   pubkey: string;
   image: string;
   name: string;
-  following?: string[];
+  following: string[];
 }
 
 const initialState: UserState = {
@@ -18,7 +18,7 @@ export const userSlice = createSlice({
   name: 'user',
   initialState,
   reducers: {
-    setUser: (state, action: PayloadAction<UserState>) => {
+    setUser: (state, action: PayloadAction<{pubkey: string; image: string; name: string;}>) => {
       state.pubkey = action.payload.pubkey;
       state.image = action.payload.image;
       state.name = action.payload.name;

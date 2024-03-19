@@ -3,13 +3,12 @@ import { useSelector } from "react-redux";
 import { useEffect, useState } from "react";
 import NDK, { NDKEvent, NDKFilter } from "@nostr-dev-kit/ndk";
 import { useNdk } from "@/hooks/useNdk";
-import { Nip87Kinds } from "@/types";
+import { Nip87Kinds, Nip87MintInfo, Nip87MintReccomendation } from "@/types";
 import { RootState, useAppDispatch } from "@/redux/store";
 import {
   addMintInfosAsync,
   addMintEndorsementAsync,
 } from "@/redux/slices/nip87Slice";
-import NostrProfile from "@/components/NostrProfile";
 import TableRowMint from "./TableRowMint";
 import TableRowEndorsement from "./TableRowEndorsement";
 import MintFilters from "./MintFilters";
@@ -18,6 +17,8 @@ import ReviewFilters from "./ReviewFilters";
 const MintTable = () => {
   const [mintsPage, setMintsPage] = useState(1);
   const [reviewsPage, setReviewsPage] = useState(1);
+  const [mintInfos, setMintInfos] = useState<Nip87MintInfo[]>([]);
+  const [reviews, setReviews] = useState<Nip87MintReccomendation[]>([]);
   const dispatch = useAppDispatch();
 
   const maxPerPage = 10;
@@ -60,19 +61,39 @@ const MintTable = () => {
     });
   }, [ndk, dispatch]);
 
-  const { mintInfos, endorsements } = useSelector(
-    (state: RootState) => state.nip87
-  );
+  const { mintInfos: unfilteredMintInfos, endorsements: unfilteredReviews } =
+    useSelector((state: RootState) => state.nip87);
 
   useEffect(() => {
-    console.log("mints", mintInfos);
-    console.log("endorsements", endorsements);
-  }, [mintInfos, endorsements]);
+    const filteredMintInfos = unfilteredMintInfos.filter((mint) => {
+      const avgRating = mint.totalRatings / mint.numRecsWithRatings;
+      if (avgRating < filters.mints.minRating) {
+        return false;
+      }
+      if (mint.numRecommendations < filters.mints.minRecs) {
+        console
+        return false;
+      }
+      return true;
+    });
+    setMintInfos(filteredMintInfos);
+  }, [unfilteredMintInfos, filters.mints]);
+
+  useEffect(() => {
+    const filteredReviews = unfilteredReviews.filter((review) => {
+      if (filters.reviews.friends && !following.includes(review.userPubkey)) {
+        return false;
+      }
+      return true;
+    });
+    setReviews(filteredReviews);
+  }, [unfilteredReviews, filters.reviews, following]);
 
   return (
     <div className="w-full">
       <Tabs style="fullWidth">
         <Tabs.Item title="Mints">
+          <MintFilters />
           <div className="overflow-x-auto max-h-screen">
             <Table className="overflow-x-auto">
               <Table.Head>
@@ -110,6 +131,7 @@ const MintTable = () => {
           title="Reviews"
           className="focus:shadow-none focus:border-transparent"
         >
+          <ReviewFilters/>
           <div className="overflow-x-auto max-h-screen">
             <Table className="w-full">
               <Table.Head className="">
@@ -122,13 +144,13 @@ const MintTable = () => {
                 </Table.HeadCell>
               </Table.Head>
               <Table.Body className="divide-y">
-                {endorsements
+                {reviews
                   .slice(
                     reviewsPage * maxPerPage - maxPerPage,
                     reviewsPage * maxPerPage
                   )
-                  .map((endorsement, idx) => (
-                    <TableRowEndorsement endorsement={endorsement} key={idx} />
+                  .map((review, idx) => (
+                    <TableRowEndorsement endorsement={review} key={idx} />
                   ))}
               </Table.Body>
             </Table>
@@ -137,7 +159,7 @@ const MintTable = () => {
             <Pagination
               currentPage={reviewsPage}
               onPageChange={(page) => setReviewsPage(page)}
-              totalPages={Math.ceil(endorsements.length / maxPerPage)}
+              totalPages={Math.ceil(reviews.length / maxPerPage)}
             />
           </div>
         </Tabs.Item>
