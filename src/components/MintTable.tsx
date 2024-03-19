@@ -11,14 +11,36 @@ import {
 } from "@/redux/slices/nip87Slice";
 import TableRowMint from "./TableRowMint";
 import TableRowEndorsement from "./TableRowEndorsement";
-import MintFilters from "./MintFilters";
-import ReviewFilters from "./ReviewFilters";
+import Filters from "./Filters";
+import { setMintsFilter, setReviewsFilter } from "@/redux/slices/filterSlice";
 
 const MintTable = () => {
   const [mintsPage, setMintsPage] = useState(1);
   const [reviewsPage, setReviewsPage] = useState(1);
   const [mintInfos, setMintInfos] = useState<Nip87MintInfo[]>([]);
   const [reviews, setReviews] = useState<Nip87MintReccomendation[]>([]);
+  const [minRecs, setMinRecs] = useState(0);
+  const [minRating, setMinRating] = useState(0);
+  const [onlyFriends, setOnlyFriends] = useState(false);
+  const [showCashu, setShowCashu] = useState(true);
+  const [showFedimint, setShowFedimint] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
+  
+  const filterProps = {
+    minRecs,
+    minRating,
+    onlyFriends,
+    showCashu,
+    showFedimint,
+    showFilters,
+    setMinRecs,
+    setMinRating,
+    setOnlyFriends,
+    setShowCashu,
+    setShowFedimint,
+    setShowFilters
+  }
+  
   const dispatch = useAppDispatch();
 
   const maxPerPage = 10;
@@ -89,11 +111,20 @@ const MintTable = () => {
     setReviews(filteredReviews);
   }, [unfilteredReviews, filters.reviews, following]);
 
+  useEffect(() => {
+    dispatch(setMintsFilter({minRecs, minRating}))
+  }, [minRecs, minRating]);
+
+
+  useEffect(() => {
+    dispatch(setReviewsFilter({friends: onlyFriends}))
+  }, [onlyFriends]);
+
   return (
     <div className="w-full">
       <Tabs style="fullWidth">
         <Tabs.Item title="Mints">
-          <MintFilters />
+          <Filters {...filterProps}/>
           <div className="overflow-x-auto max-h-screen">
             <Table className="overflow-x-auto">
               <Table.Head>
@@ -131,7 +162,7 @@ const MintTable = () => {
           title="Reviews"
           className="focus:shadow-none focus:border-transparent"
         >
-          <ReviewFilters/>
+          <Filters {...filterProps}/>
           <div className="overflow-x-auto max-h-screen">
             <Table className="w-full">
               <Table.Head className="">
