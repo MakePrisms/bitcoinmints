@@ -34,7 +34,7 @@ export const getMintInfo = async (mintUrl: string): Promise<MintData> => {
     version: "v0" | "v1"
   ) => {
     try {
-      const res = await fetchWithTimeout(`${mintUrl}/${endpoint}`, {}, 1000);
+      const res = await fetchWithTimeout(`${mintUrl}/${endpoint}`, {}, 10_000);
       const mintInfo = (await res.json()) as GetMintInfoResponse;
 
       if (res.status !== 200) {
