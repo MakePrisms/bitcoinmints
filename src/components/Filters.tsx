@@ -1,5 +1,7 @@
-import { Checkbox, Label, RangeSlider } from "flowbite-react";
-import { useState } from "react";
+import { RootState } from "@/redux/store";
+import { Checkbox, RangeSlider } from "flowbite-react";
+import { useEffect } from "react";
+import { useSelector } from "react-redux";
 
 interface FiltersProps {
   minRecs: number;
@@ -30,6 +32,14 @@ const MintFilters = ({
   setShowFedimint,
   setShowFilters,
 }: FiltersProps) => {
+  const loggedIn = useSelector((state: RootState) => state.user.pubkey !== "")
+
+  useEffect(() => {
+    if (!loggedIn) {
+      setOnlyFriends(false)
+    }
+  }, [loggedIn])
+
   return (
     <>
       <div className={`ml-3 mb-${showFilters ? 1 : 5}`}>
@@ -83,6 +93,7 @@ const MintFilters = ({
                 checked={onlyFriends}
                 onChange={(e) => setOnlyFriends(e.target.checked)}
                 className="mr-2"
+                disabled={!loggedIn}
               />
               <span>1st</span>
             </div>
