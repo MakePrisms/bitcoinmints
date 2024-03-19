@@ -47,7 +47,7 @@ export const getMintInfo = async (mintUrl: string): Promise<MintData> => {
       if (version === "v0") {
         const nuts = mintInfo.nuts as V0NutData;
         nutNums = nuts.map((str) => parseInt(str.split("-")[1], 10));
-        data.name = data.name;
+        data.name = mintInfo.name;
       } else {
         const nuts = mintInfo.nuts as V1NutData;
         nutNums = Object.keys(nuts)
