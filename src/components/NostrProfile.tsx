@@ -13,10 +13,6 @@ const NostrProfile = ({ pubkey }: { pubkey: string }) => {
     fetchUserProfile(pubkey).then(setProfile);
   }, [pubkey, fetchUserProfile]);
 
-  if (!profile) {
-    return <Avatar size="sm" className="mb-1" />;
-  }
-
   return (
     <a
       href={`https://njump.me/${nip19.npubEncode(pubkey)}`}
@@ -30,7 +26,7 @@ const NostrProfile = ({ pubkey }: { pubkey: string }) => {
           className="mb-1"
         />
         <div>
-          <h3 className="text-sm font-semibold">{profile?.name}</h3>
+          <h3 className="text-sm font-semibold">{profile?.name || ""}</h3>
         </div>
       </div>
     </a>
