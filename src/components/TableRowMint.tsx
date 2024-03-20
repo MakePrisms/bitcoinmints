@@ -8,10 +8,13 @@ import { RootState } from "@/redux/store";
 import { deleteMintInfo } from "@/redux/slices/nip87Slice";
 import ReviewMintButton from "./ReviewMintButton";
 import { copyToClipboard, shortenString } from "@/utils";
+import { useRouter } from "next/router";
 
 const TableRowMint = ({ mint }: { mint: Nip87MintInfo }) => {
   const [copied, setCopied] = useState(false);
   const [show, setShow] = useState(false);
+
+  const router = useRouter();
 
   const user = useSelector((state: RootState) => state.user);
 
@@ -36,6 +39,17 @@ const TableRowMint = ({ mint }: { mint: Nip87MintInfo }) => {
     setTimeout(() => setCopied(false), 3000);
   };
 
+  const handleReviewsClick = () => {
+    router.push(
+      {
+        pathname: router.pathname,
+        query: { ...router.query, tab: "reviews", mintUrl: mint.mintUrl },
+      },
+      undefined,
+      { shallow: true }
+    );
+  };
+
   return (
     <>
       <Table.Row className="dark:bg-gray-800">
@@ -47,9 +61,16 @@ const TableRowMint = ({ mint }: { mint: Nip87MintInfo }) => {
           {mint.totalRatings ? (
             <Rating>
               <Rating.Star />
-              &nbsp;{mint.totalRatings / mint.numRecsWithRatings || "No reviews"}
+              &nbsp;
+              {mint.totalRatings / mint.numRecsWithRatings || "No reviews"}
               &nbsp;&middot;&nbsp;
-              {mint.numRecsWithRatings} review{mint.numRecsWithRatings > 1 ? "s" : ""}
+              <span
+                className="hover:cursor-pointer underline"
+                onClick={handleReviewsClick}
+              >
+                {mint.numRecsWithRatings} review
+                {mint.numRecsWithRatings > 1 ? "s" : ""}
+              </span>
             </Rating>
           ) : (
             "No reviews"

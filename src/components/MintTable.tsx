@@ -1,6 +1,6 @@
-import { Tabs, Table, Pagination } from "flowbite-react";
+import { Tabs, Table, Pagination, TabsRef } from "flowbite-react";
 import { useSelector } from "react-redux";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import NDK, { NDKEvent, NDKFilter } from "@nostr-dev-kit/ndk";
 import { useNdk } from "@/hooks/useNdk";
 import { Nip87Kinds, Nip87MintInfo, Nip87MintReccomendation } from "@/types";
@@ -13,6 +13,8 @@ import TableRowMint from "./TableRowMint";
 import TableRowEndorsement from "./TableRowEndorsement";
 import Filters from "./Filters";
 import { setMintsFilter, setReviewsFilter } from "@/redux/slices/filterSlice";
+import { useRouter } from "next/router";
+import { ParsedUrlQueryInput } from "querystring";
 
 const MintTable = () => {
   const [mintsPage, setMintsPage] = useState(1);
@@ -25,7 +27,11 @@ const MintTable = () => {
   const [showCashu, setShowCashu] = useState(true);
   const [showFedimint, setShowFedimint] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
-  
+  const [mintUrlToShow, setMintUrlToShow] = useState<string | undefined>();
+  const tabsRef = useRef<TabsRef>(null);
+
+  const router = useRouter();
+
   const filterProps = {
     minRecs,
     minRating,
@@ -49,6 +55,47 @@ const MintTable = () => {
   const following = useSelector((state: RootState) => state.user.following);
 
   const { ndk } = useNdk();
+
+  const handleTabChange = (tab: number) => {
+    const newQuery: ParsedUrlQueryInput = {...router.query};
+    
+    const tabQueryParam = tab === 0 ? "mints" : "reviews";
+    if (router.query.tab !== tabQueryParam) {
+      newQuery.tab = tabQueryParam;
+    }
+    
+    if (tab === 0 && router.query.mintUrl) {
+      delete newQuery.mintUrl;
+      setMintUrlToShow(undefined);
+    }
+    
+    // check if newQuery is different from router.query
+    if(JSON.stringify(newQuery) === JSON.stringify(router.query)) return;
+
+    router.push(
+      {
+        pathname: router.pathname,
+        query: newQuery,
+      },
+      undefined,
+      { shallow: true }
+    );
+
+    //always reset page to 1 when changing tabs
+    setMintsPage(1);
+    setReviewsPage(1);
+  };
+
+  useEffect(() => {
+    if (router.query.tab) {
+      tabsRef.current?.setActiveTab(router.query.tab === "mints" ? 0 : 1);
+    };
+
+    if (router.query.mintUrl) {
+      setMintUrlToShow(router.query.mintUrl as string);
+    }
+
+  }, [router.query]);
 
   useEffect(() => {
     if (!ndk) return;
@@ -106,15 +153,19 @@ const MintTable = () => {
       if (filters.reviews.friends && !following.includes(review.userPubkey)) {
         return false;
       }
+
+      if (mintUrlToShow && mintUrlToShow !== review.mintUrl) {
+        return false;
+      }
+
       return true;
     });
     setReviews(filteredReviews);
-  }, [unfilteredReviews, filters.reviews, following]);
+  }, [unfilteredReviews, filters.reviews, following, mintUrlToShow]);
 
   useEffect(() => {
     dispatch(setMintsFilter({minRecs, minRating}))
   }, [minRecs, minRating]);
-
 
   useEffect(() => {
     dispatch(setReviewsFilter({friends: onlyFriends}))
@@ -122,9 +173,9 @@ const MintTable = () => {
 
   return (
     <div className="w-full">
-      <Tabs style="fullWidth">
-        <Tabs.Item title="Mints">
-          <Filters {...filterProps}/>
+      <Tabs style="fullWidth" onActiveTabChange={handleTabChange} ref={tabsRef}>
+        <Tabs.Item title="Mints" active>
+          <Filters {...filterProps} />
           <div className="overflow-x-auto">
             <Table className="overflow-x-auto">
               <Table.Head>
