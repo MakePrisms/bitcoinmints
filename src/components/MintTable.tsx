@@ -15,6 +15,11 @@ import Filters from "./Filters";
 import { setMintsFilter, setReviewsFilter } from "@/redux/slices/filterSlice";
 import { useRouter } from "next/router";
 import { ParsedUrlQueryInput } from "querystring";
+import {
+  IoIosArrowDown,
+  IoIosArrowForward,
+  IoIosArrowUp,
+} from "react-icons/io";
 
 const MintTable = () => {
   const [mintsPage, setMintsPage] = useState(1);
@@ -29,6 +34,7 @@ const MintTable = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [mintUrlToShow, setMintUrlToShow] = useState<string | undefined>();
   const tabsRef = useRef<TabsRef>(null);
+  const [ratingSort, setRatingSort] = useState<"asc" | "desc" | undefined>();
 
   const router = useRouter();
 
@@ -44,9 +50,9 @@ const MintTable = () => {
     setOnlyFriends,
     setShowCashu,
     setShowFedimint,
-    setShowFilters
-  }
-  
+    setShowFilters,
+  };
+
   const dispatch = useAppDispatch();
 
   const maxPerPage = 10;
@@ -57,20 +63,20 @@ const MintTable = () => {
   const { ndk } = useNdk();
 
   const handleTabChange = (tab: number) => {
-    const newQuery: ParsedUrlQueryInput = {...router.query};
-    
+    const newQuery: ParsedUrlQueryInput = { ...router.query };
+
     const tabQueryParam = tab === 0 ? "mints" : "reviews";
     if (router.query.tab !== tabQueryParam) {
       newQuery.tab = tabQueryParam;
     }
-    
+
     if (tab === 0 && router.query.mintUrl) {
       delete newQuery.mintUrl;
       setMintUrlToShow(undefined);
     }
-    
+
     // check if newQuery is different from router.query
-    if(JSON.stringify(newQuery) === JSON.stringify(router.query)) return;
+    if (JSON.stringify(newQuery) === JSON.stringify(router.query)) return;
 
     router.push(
       {
@@ -86,15 +92,22 @@ const MintTable = () => {
     setReviewsPage(1);
   };
 
+  const toggleRatingSort = () => {
+    const states = ["desc", "asc", undefined];
+    const currentIndex = states.indexOf(ratingSort);
+    setRatingSort(
+      states[(currentIndex + 1) % states.length] as "asc" | "desc" | undefined
+    );
+  };
+
   useEffect(() => {
     if (router.query.tab) {
       tabsRef.current?.setActiveTab(router.query.tab === "mints" ? 0 : 1);
-    };
+    }
 
     if (router.query.mintUrl) {
       setMintUrlToShow(router.query.mintUrl as string);
     }
-
   }, [router.query]);
 
   useEffect(() => {
@@ -140,7 +153,6 @@ const MintTable = () => {
         return false;
       }
       if (mint.numRecommendations < filters.mints.minRecs) {
-        console
         return false;
       }
       return true;
@@ -164,11 +176,11 @@ const MintTable = () => {
   }, [unfilteredReviews, filters.reviews, following, mintUrlToShow]);
 
   useEffect(() => {
-    dispatch(setMintsFilter({minRecs, minRating}))
+    dispatch(setMintsFilter({ minRecs, minRating }));
   }, [minRecs, minRating]);
 
   useEffect(() => {
-    dispatch(setReviewsFilter({friends: onlyFriends}))
+    dispatch(setReviewsFilter({ friends: onlyFriends }));
   }, [onlyFriends]);
 
   return (
@@ -180,7 +192,21 @@ const MintTable = () => {
             <Table className="overflow-x-auto">
               <Table.Head>
                 <Table.HeadCell>Mint</Table.HeadCell>
-                <Table.HeadCell>Rating</Table.HeadCell>
+                <Table.HeadCell className="flex">
+                  <span>Rating</span>&nbsp;
+                  <span
+                    className="hover:cursor-pointer"
+                    onClick={toggleRatingSort}
+                  >
+                    {!ratingSort ? (
+                      <IoIosArrowForward />
+                    ) : ratingSort === "desc" ? (
+                      <IoIosArrowDown />
+                    ) : (
+                      <IoIosArrowUp />
+                    )}
+                  </span>
+                </Table.HeadCell>
                 <Table.HeadCell>URL</Table.HeadCell>
                 <Table.HeadCell>Supported Nuts</Table.HeadCell>
                 <Table.HeadCell>
@@ -193,6 +219,20 @@ const MintTable = () => {
                     mintsPage * maxPerPage - maxPerPage,
                     mintsPage * maxPerPage
                   )
+                  .sort((a, b) => {
+                    const aRating =
+                      a.numRecsWithRatings *
+                        (a.totalRatings / a.numRecsWithRatings / 5) || 0;
+                    const bRating =
+                      b.numRecsWithRatings *
+                        (b.totalRatings / b.numRecsWithRatings / 5) || 0;
+                    if (!ratingSort) return 0;
+                    if (ratingSort === "asc") {
+                      return aRating - bRating;
+                    } else {
+                      return bRating - aRating;
+                    }
+                  })
                   .map((mint, idx) => (
                     <TableRowMint mint={mint} key={idx} />
                   ))}
@@ -213,7 +253,7 @@ const MintTable = () => {
           title="Reviews"
           className="focus:shadow-none focus:border-transparent"
         >
-          <Filters {...filterProps}/>
+          <Filters {...filterProps} />
           <div className="overflow-x-auto">
             <Table className="w-full">
               <Table.Head className="">
