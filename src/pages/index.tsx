@@ -2,7 +2,7 @@ import { Inter } from "next/font/google";
 import Header from "@/components/Header";
 import ReviewMintButton from "@/components/buttons/ReviewMintButton";
 import ListMintButton from "@/components/buttons/ListMintButton";
-import MintTable from "@/components/mainTable/MintTable";
+import MainTable from "@/components/mainTable/MainTable";
 import Footer from "@/components/Footer";
 import Head from "next/head";
 
@@ -24,7 +24,7 @@ export default function Home() {
           <ListMintButton />
           <ReviewMintButton text="Review a Mint" />
         </div>
-        <MintTable />
+        <MainTable />
       </main>
       <Footer />
     </>

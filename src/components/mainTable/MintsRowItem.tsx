@@ -10,7 +10,7 @@ import ReviewMintButton from "../buttons/ReviewMintButton";
 import { copyToClipboard, shortenString } from "@/utils";
 import { useRouter } from "next/router";
 
-const TableRowMint = ({ mint }: { mint: Nip87MintInfo }) => {
+const MintsRowItem = ({ mint }: { mint: Nip87MintInfo }) => {
   const [copied, setCopied] = useState(false);
   const [show, setShow] = useState(false);
 
@@ -106,4 +106,4 @@ const TableRowMint = ({ mint }: { mint: Nip87MintInfo }) => {
   );
 };
 
-export default TableRowMint;
+export default MintsRowItem;

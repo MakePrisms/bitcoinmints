@@ -9,7 +9,7 @@ import {
   addMintInfosAsync,
   addReviewAsync,
 } from "@/redux/slices/nip87Slice";
-import TableRowMint from "./TableRowMint";
+import MintsRowItem from "./MintsRowItem";
 import TableRowEndorsement from "./ReviewsRowItem";
 import Filters from "./Filters";
 import { setMintsFilter, setReviewsFilter } from "@/redux/slices/filterSlice";
@@ -234,7 +234,7 @@ const MintTable = () => {
                     }
                   })
                   .map((mint, idx) => (
-                    <TableRowMint mint={mint} key={idx} />
+                    <MintsRowItem mint={mint} key={idx} />
                   ))}
               </Table.Body>
             </Table>
