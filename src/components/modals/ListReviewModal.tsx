@@ -1,4 +1,4 @@
-import { Button, Modal, TextInput, Label, Rating } from "flowbite-react";
+import { Button, Modal, TextInput, Label, Rating, Textarea } from "flowbite-react";
 
 interface ListReviewModalProps {
   show: boolean;
@@ -68,12 +68,13 @@ const ListReviewModal = ({
             (review !== undefined && setReview) ? (
               <div>
               <Label>Review</Label>
-              <TextInput
-                placeholder="I've been using this mint for a while now and it's been great!"
+              <Textarea
+                placeholder="I've been using this mint for a while now and it hasn't rugged me!"
                 id="review"
                 required
                 value={review}
                 onChange={(e) => setReview(e.target.value)}
+                rows={3}
               />
             </div>
             ) : null

@@ -58,23 +58,28 @@ const MintsRowItem = ({ mint }: { mint: Nip87MintInfo }) => {
 
         {/* Average Rating */}
         <Table.Cell>
-          {mint.totalRatings ? (
-            <Rating>
-              <Rating.Star />
-              &nbsp;
-              {mint.totalRatings / mint.reviewsWithRating || "No reviews"}
-              &nbsp;&middot;&nbsp;
-              <span
-                className="hover:cursor-pointer underline"
-                onClick={handleReviewsClick}
-              >
-                {mint.reviewsWithRating} review
-                {mint.reviewsWithRating > 1 ? "s" : ""}
-              </span>
-            </Rating>
-          ) : (
-            "No reviews"
-          )}
+          <div className="flex flex-col md:flex-row">
+            {mint.totalRatings ? (
+              <>
+                <Rating>
+                  <Rating.Star />
+                  &nbsp;
+                  {mint.totalRatings / mint.reviewsWithRating || "No reviews"}
+                &nbsp;&middot;&nbsp;
+                </Rating>
+                <div
+                  className="hover:cursor-pointer underline w-fit whitespace-nowrap"
+                  onClick={handleReviewsClick}
+                  
+                >
+                  {mint.reviewsWithRating} review
+                  {mint.reviewsWithRating > 1 ? "s" : ""}
+                </div>
+              </>
+            ) : (
+              "No reviews"
+            )}
+          </div>
         </Table.Cell>
 
         {/*  Mint Url */}

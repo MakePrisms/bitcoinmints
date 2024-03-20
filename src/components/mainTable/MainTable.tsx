@@ -192,20 +192,22 @@ const MintTable = () => {
             <Table className="overflow-x-auto">
               <Table.Head>
                 <Table.HeadCell>Mint</Table.HeadCell>
-                <Table.HeadCell className="flex">
+                <Table.HeadCell>
+                  <div  className="flex"> 
                   <span>Rating</span>&nbsp;
                   <span
-                    className="hover:cursor-pointer"
+                    className="hover:cursor-pointer mt-0.5"
                     onClick={toggleRatingSort}
                   >
                     {!ratingSort ? (
                       <IoIosArrowForward />
-                    ) : ratingSort === "desc" ? (
-                      <IoIosArrowDown />
-                    ) : (
-                      <IoIosArrowUp />
-                    )}
+                      ) : ratingSort === "desc" ? (
+                        <IoIosArrowDown />
+                        ) : (
+                          <IoIosArrowUp />
+                          )}
                   </span>
+                          </div>
                 </Table.HeadCell>
                 <Table.HeadCell>URL</Table.HeadCell>
                 <Table.HeadCell>Supported Nuts</Table.HeadCell>
