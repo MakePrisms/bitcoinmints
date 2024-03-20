@@ -26,6 +26,20 @@ const initialState: Nip87State = {
   error: null,
 };
 
+const fetchMintInfoCache = new Map<string, MintData | Promise<MintData>>();
+
+const getMintInfoWithCache = async (url: string) => {
+  if (!fetchMintInfoCache.has(url)) {
+    fetchMintInfoCache.set(url, getMintInfo(url).then(data => data). catch(e => {
+      fetchMintInfoCache.delete(url);
+      console.error("Error fetching mint url", e);
+      throw e;
+    }));
+  }
+
+  return fetchMintInfoCache.get(url)!;
+}
+
 export const addMintInfosAsync = createAsyncThunk(
   'nip87/addMint',
   async ({ event, relay }: { event: NostrEvent; relay?: string }, {getState, dispatch }) => {
@@ -40,12 +54,11 @@ export const addMintInfosAsync = createAsyncThunk(
     if (fetchedMint) {
       mintName = fetchedMint.name;
     } else {
-      const mintData = await getMintInfo(mintUrls[0])
+      const mintData = await getMintInfoWithCache(mintUrls[0])
       const {name} = mintData;
       dispatch(addMintData(mintData));
       mintName = name;
     }
-
 
     dispatch(addMint({ event, relay, mintName }));
   })
@@ -65,7 +78,7 @@ export const addMintEndorsementAsync = createAsyncThunk(
       if (fetchedMint) {
         mintName = fetchedMint.name;
       } else {
-        const mintData = await getMintInfo(mintUrls[0])
+        const mintData = await getMintInfoWithCache(mintUrls[0])
         const {name} = mintData;
         dispatch(addMintData(mintData));
         mintName = name;
