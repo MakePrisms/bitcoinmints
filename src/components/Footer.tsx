@@ -1,6 +1,6 @@
 import { Footer as FlowbiteFooter } from "flowbite-react";
 import { IconType } from "react-icons";
-import { BsDiscord, BsTwitterX } from "react-icons/bs";
+import { BsDiscord, BsGithub, BsTwitterX } from "react-icons/bs";
 import { GiOstrich } from "react-icons/gi";
 // Define props for IconWrapper
 interface IconWrapperProps {
@@ -44,6 +44,13 @@ const CustomTwitter: React.FC = () => (
   />
 );
 
+const CustomGithub: React.FC = () => (
+  <IconWrapper 
+    IconComponent={BsGithub}
+    iconProps={{ className: "text-white" }}
+  />
+)
+
 const Footer = () => {
   return (
     <FlowbiteFooter container className="bg-gradient-to-r from-gray-900 to-gray-800 rounded-none">
@@ -75,6 +82,11 @@ const Footer = () => {
               href="https://twitter.com/makeprisms"
               target="__blank"
               icon={CustomTwitter}
+            />
+            <FlowbiteFooter.Icon 
+              href="https://github.com/MakePrisms/bitcoinmints"
+              icon={CustomGithub}
+              target="__blank"
             />
           </div>
         </div>
