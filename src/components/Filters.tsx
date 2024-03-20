@@ -51,7 +51,7 @@ const MintFilters = ({
         </button>
       </div>
       {showFilters && (
-        <form className="flex flex-col md:flex-row md:justify-start text-gray-400">
+        <form className="flex flex-col md:flex-row md:justify-start text-gray-400 text-sm">
           <div className="mb-5 ml-3 md:mr-5">
             <div className="mb-1 block">
               <label htmlFor="num-recs-slider">Total reviews</label>
@@ -63,8 +63,9 @@ const MintFilters = ({
                 id="num-recs-slider"
                 min={0}
                 max={10}
+                sizing="sm"
               />
-              <span className="ml-1">{minRecs} & up</span>
+              <span className="ml-1 mt-0.5">{minRecs} & up</span>
             </div>
           </div>
           <div className="mb-5 ml-3 md:mr-5">
@@ -79,8 +80,9 @@ const MintFilters = ({
                 id="avg-rating-slider"
                 min={0}
                 max={5}
+                sizing="sm"
               />
-              <span className="ml-1">{minRating} & up</span>
+              <span className="ml-1 mt-0.5">{minRating} & up</span>
             </div>
           </div>
           <div className="mb-5 ml-3 md:mr-5">
