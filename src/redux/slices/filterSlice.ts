@@ -6,7 +6,7 @@ interface FilterState {
   };
   mints: {
     minRating: number;
-    minRecs: number;
+    minReviews: number;
   }
 }
 
@@ -16,7 +16,7 @@ const initialState: FilterState = {
   },
   mints: {
     minRating: 0,
-    minRecs: 0,
+    minReviews: 0,
   }
 };
 

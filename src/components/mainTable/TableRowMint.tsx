@@ -62,14 +62,14 @@ const TableRowMint = ({ mint }: { mint: Nip87MintInfo }) => {
             <Rating>
               <Rating.Star />
               &nbsp;
-              {mint.totalRatings / mint.numRecsWithRatings || "No reviews"}
+              {mint.totalRatings / mint.reviewsWithRating || "No reviews"}
               &nbsp;&middot;&nbsp;
               <span
                 className="hover:cursor-pointer underline"
                 onClick={handleReviewsClick}
               >
-                {mint.numRecsWithRatings} review
-                {mint.numRecsWithRatings > 1 ? "s" : ""}
+                {mint.reviewsWithRating} review
+                {mint.reviewsWithRating > 1 ? "s" : ""}
               </span>
             </Rating>
           ) : (

@@ -13,7 +13,7 @@ import { RootState } from "../store";
 interface Nip87State {
   mints: MintData[];
   mintInfos: Nip87MintInfo[];
-  endorsements: Nip87MintReccomendation[];
+  reviews: Nip87MintReccomendation[];
   loading: boolean;
   error?: null | string;
 }
@@ -21,7 +21,7 @@ interface Nip87State {
 const initialState: Nip87State = {
   mints: [],
   mintInfos: [],
-  endorsements: [],
+  reviews: [],
   loading: false,
   error: null,
 };
@@ -63,8 +63,8 @@ export const addMintInfosAsync = createAsyncThunk(
     dispatch(addMint({ event, relay, mintName }));
   })
 
-export const addMintEndorsementAsync = createAsyncThunk(
-  'nip87/addMintEndorsement',
+export const addReviewAsync = createAsyncThunk(
+  'nip87/addReview',
   async ({ event, infoEventRelay }: { event: NostrEvent; infoEventRelay?: string }, {getState, dispatch }) => {
     const mintUrls = event.tags.filter((tag) => tag[0] === "u" && tag[2] === "cashu").map((tag) => tag[1]);
 
@@ -87,7 +87,7 @@ export const addMintEndorsementAsync = createAsyncThunk(
       mintNameMap.push({mintUrl, mintName});
     }
 
-    dispatch(addMintEndorsement({ event, infoEventRelay, mintNameMap }));
+    dispatch(addReview({ event, infoEventRelay, mintNameMap }));
   }
 
 )
@@ -124,15 +124,15 @@ const nip87Slice = createSlice({
               rawEvent: action.payload.event,
               supportedNuts: action.payload.event.tags.find(t => t[0] === "nuts")?.[1],
               relay: action.payload.relay,
-              numRecommendations: state.endorsements.filter(e => e.mintUrl === mintUrl).length,
-              totalRatings: state.endorsements.filter(e => e.mintUrl === mintUrl).reduce((acc, e) => acc + (e.rating || 0), 0),
-              numRecsWithRatings: state.endorsements.filter(e => e.mintUrl === mintUrl).filter(e => e.rating).length,
+              numReviews: state.reviews.filter(e => e.mintUrl === mintUrl).length,
+              totalRatings: state.reviews.filter(e => e.mintUrl === mintUrl).reduce((acc, e) => acc + (e.rating || 0), 0),
+              reviewsWithRating: state.reviews.filter(e => e.mintUrl === mintUrl).filter(e => e.rating).length,
             },
           ];
         }
       });
     },
-    addMintEndorsement(
+    addReview(
       state,
       action: { payload: { event: NostrEvent; mintNameMap: {mintUrl: string; mintName: string;}[], infoEventRelay?: string } }
     ) {
@@ -148,17 +148,17 @@ const nip87Slice = createSlice({
       if (mintUrls.length === 0) return;
 
       mintUrls.forEach((mintUrl) => {
-        const exists = state.endorsements.find(
-          (endorsement) =>
-            `${endorsement.mintUrl}${endorsement.userPubkey}` ===
+        const exists = state.reviews.find(
+          (r) =>
+            `${r.mintUrl}${r.userPubkey}` ===
             `${mintUrl}${action.payload.event.pubkey}`
         );
 
         const mintName = action.payload.mintNameMap.find(m => m.mintUrl === mintUrl)?.mintName!;
 
         if (!exists) {
-          state.endorsements = [
-            ...state.endorsements,
+          state.reviews = [
+            ...state.reviews,
             {
               mintType: Nip87MintTypes.Cashu,
               mintUrl,
@@ -173,24 +173,24 @@ const nip87Slice = createSlice({
           // update the mint info with new review data
           const mintInfo = state.mintInfos.find(m => m.mintUrl === mintUrl);
           if (mintInfo) {
-            mintInfo.numRecommendations = mintInfo.numRecommendations + 1;
+            mintInfo.numReviews = mintInfo.numReviews + 1;
             mintInfo.totalRatings = mintInfo.totalRatings + (rating ? parseInt(rating) : 0);
-            mintInfo.numRecsWithRatings = mintInfo.numRecsWithRatings + (rating ? 1 : 0);
+            mintInfo.reviewsWithRating = mintInfo.reviewsWithRating + (rating ? 1 : 0);
             // update the mint info in the state
             state.mintInfos = state.mintInfos.map(m => m.mintUrl === mintUrl ? mintInfo : m);
           }
         }
       });
     },
-    deleteMintEndorsement(state, action: { payload: string }) {
-      state.endorsements = state.endorsements.filter(
-        (endorsement) =>
-          `${endorsement.mintUrl}${endorsement.userPubkey}` !== action.payload
+    deleteReview(state, action: { payload: string }) {
+      state.reviews = state.reviews.filter(
+        (r) =>
+          `${r.mintUrl}${r.userPubkey}` !== action.payload
       );
       const mintInfo = state.mintInfos.find(m => m.mintUrl === action.payload);
       if (mintInfo) {
-        mintInfo.numRecommendations = mintInfo.numRecommendations - 1;
-        //TODO: decrement totalRatings and numRecsWithRatings
+        mintInfo.numReviews = mintInfo.numReviews - 1;
+        //TODO: decrement totalRatings and reviewsWithRating
         // update the mint info in the state
         state.mintInfos = state.mintInfos.map(m => m.mintUrl === action.payload ? mintInfo : m);
       }
@@ -207,7 +207,7 @@ export default nip87Slice.reducer;
 export const {
   addMintData,
   addMint,
-  addMintEndorsement,
-  deleteMintEndorsement,
+  addReview,
+  deleteReview,
   deleteMintInfo,
 } = nip87Slice.actions;

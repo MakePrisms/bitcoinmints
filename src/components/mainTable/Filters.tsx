@@ -4,13 +4,13 @@ import { useEffect } from "react";
 import { useSelector } from "react-redux";
 
 interface FiltersProps {
-  minRecs: number;
+  minReviews: number;
   minRating: number;
   onlyFriends: boolean;
   showCashu: boolean;
   showFedimint: boolean;
   showFilters: boolean;
-  setMinRecs: (minRecs: number) => void;
+  setMinReviews: (minReviews: number) => void;
   setMinRating: (minRating: number) => void;
   setOnlyFriends: (onlyFriends: boolean) => void;
   setShowCashu: (showCashu: boolean) => void;
@@ -19,13 +19,13 @@ interface FiltersProps {
 }
 
 const MintFilters = ({
-  minRecs,
+  minReviews,
   minRating,
   onlyFriends,
   showCashu,
   showFedimint,
   showFilters,
-  setMinRecs,
+  setMinReviews,
   setMinRating,
   setOnlyFriends,
   setShowCashu,
@@ -54,18 +54,18 @@ const MintFilters = ({
         <form className="flex flex-col md:flex-row md:justify-start text-gray-400 text-sm">
           <div className="mb-5 ml-3 md:mr-5">
             <div className="mb-1 block">
-              <label htmlFor="num-recs-slider">Total Reviews</label>
+              <label htmlFor="num-reviews-slider">Total Reviews</label>
             </div>
             <div className="flex">
               <RangeSlider
-                value={minRecs}
-                onChange={(e) => setMinRecs(Number(e.target.value))}
-                id="num-recs-slider"
+                value={minReviews}
+                onChange={(e) => setMinReviews(Number(e.target.value))}
+                id="num-reviews-slider"
                 min={0}
                 max={10}
                 sizing="sm"
               />
-              <span className="ml-1 mt-0.5">{minRecs} & up</span>
+              <span className="ml-1 mt-0.5">{minReviews} & up</span>
             </div>
           </div>
           <div className="mb-5 ml-3 md:mr-5">

@@ -6,7 +6,7 @@ import NostrProfile from "../NostrProfile";
 import { Nip87MintReccomendation } from "@/types";
 import { RootState } from "@/redux/store";
 import { useNdk } from "@/hooks/useNdk";
-import { deleteMintEndorsement } from "@/redux/slices/nip87Slice";
+import { deleteReview } from "@/redux/slices/nip87Slice";
 import { copyToClipboard } from "@/utils";
 import { useEffect, useState } from "react";
 
@@ -51,10 +51,10 @@ const ReviewCell = ({ review }: { review?: string }) => {
   }
 };
 
-const TableRowEndorsement = ({
-  endorsement,
+const ReviewsRowItem = ({
+  review,
 }: {
-  endorsement: Nip87MintReccomendation;
+  review: Nip87MintReccomendation;
 }) => {
   const [copied, setCopied] = useState(false);
   const user = useSelector((state: RootState) => state.user);
@@ -64,14 +64,14 @@ const TableRowEndorsement = ({
   const { attemptDeleteEvent } = useNdk();
 
   const handleDelete = async () => {
-    attemptDeleteEvent(endorsement.rawEvent);
+    attemptDeleteEvent(review.rawEvent);
 
-    const endorsementId = `${endorsement.mintUrl}${endorsement.userPubkey}`;
-    dispatch(deleteMintEndorsement(endorsementId));
+    const reviewId = `${review.mintUrl}${review.userPubkey}`;
+    dispatch(deleteReview(reviewId));
   };
 
   const handleCopy = () => {
-    copyToClipboard(endorsement.mintUrl);
+    copyToClipboard(review.mintUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 3000);
   };
@@ -79,11 +79,11 @@ const TableRowEndorsement = ({
   return (
     <Table.Row className="dark:bg-gray-800">
       <Table.Cell>
-        <NostrProfile pubkey={endorsement.userPubkey} />
+        <NostrProfile pubkey={review.userPubkey} />
       </Table.Cell>
       <Table.Cell className="hover:cursor-pointer " onClick={handleCopy}>
         <div className="flex">
-          {endorsement.mintName}
+          {review.mintName}
           {copied ? (
             <BsClipboard2CheckFill className="ml-1 mt-1" size={15} />
           ) : (
@@ -92,19 +92,19 @@ const TableRowEndorsement = ({
         </div>
       </Table.Cell>
       <Table.Cell>
-        {endorsement.rating ? (
+        {review.rating ? (
           <Rating>
             {Array.from({ length: 5 }).map((_, i) => (
-              <Rating.Star key={i} filled={i < endorsement.rating!} />
+              <Rating.Star key={i} filled={i < review.rating!} />
             ))}
           </Rating>
         ) : (
           "N/A"
         )}
       </Table.Cell>
-      <Table.Cell className="min-w-60"><ReviewCell review={endorsement.review}/></Table.Cell>
+      <Table.Cell className="min-w-60"><ReviewCell review={review.review}/></Table.Cell>
       <Table.Cell>
-        {user.pubkey === endorsement.userPubkey && (
+        {user.pubkey === review.userPubkey && (
           <Tooltip content="Attempt to delete">
             <HiTrash
               onClick={handleDelete}
@@ -117,4 +117,4 @@ const TableRowEndorsement = ({
   );
 };
 
-export default TableRowEndorsement;
+export default ReviewsRowItem;

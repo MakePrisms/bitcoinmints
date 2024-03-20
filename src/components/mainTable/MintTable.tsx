@@ -7,10 +7,10 @@ import { Nip87Kinds, Nip87MintInfo, Nip87MintReccomendation } from "@/types";
 import { RootState, useAppDispatch } from "@/redux/store";
 import {
   addMintInfosAsync,
-  addMintEndorsementAsync,
+  addReviewAsync,
 } from "@/redux/slices/nip87Slice";
 import TableRowMint from "./TableRowMint";
-import TableRowEndorsement from "./TableRowEndorsement";
+import TableRowEndorsement from "./ReviewsRowItem";
 import Filters from "./Filters";
 import { setMintsFilter, setReviewsFilter } from "@/redux/slices/filterSlice";
 import { useRouter } from "next/router";
@@ -26,7 +26,7 @@ const MintTable = () => {
   const [reviewsPage, setReviewsPage] = useState(1);
   const [mintInfos, setMintInfos] = useState<Nip87MintInfo[]>([]);
   const [reviews, setReviews] = useState<Nip87MintReccomendation[]>([]);
-  const [minRecs, setMinRecs] = useState(0);
+  const [minReviews, setMinReviews] = useState(0);
   const [minRating, setMinRating] = useState(0);
   const [onlyFriends, setOnlyFriends] = useState(false);
   const [showCashu, setShowCashu] = useState(true);
@@ -39,13 +39,13 @@ const MintTable = () => {
   const router = useRouter();
 
   const filterProps = {
-    minRecs,
+    minReviews,
     minRating,
     onlyFriends,
     showCashu,
     showFedimint,
     showFilters,
-    setMinRecs,
+    setMinReviews,
     setMinRating,
     setOnlyFriends,
     setShowCashu,
@@ -120,7 +120,7 @@ const MintTable = () => {
       { closeOnEose: false }
     );
 
-    const endorsementSub = ndk.subscribe(
+    const reviewSub = ndk.subscribe(
       {
         kinds: [Nip87Kinds.Reccomendation],
       } as unknown as NDKFilter,
@@ -133,9 +133,9 @@ const MintTable = () => {
       );
     });
 
-    endorsementSub.on("event", (event: NDKEvent) => {
+    reviewSub.on("event", (event: NDKEvent) => {
       dispatch(
-        addMintEndorsementAsync({
+        addReviewAsync({
           event: event.rawEvent(),
           infoEventRelay: undefined,
         })
@@ -143,16 +143,16 @@ const MintTable = () => {
     });
   }, [ndk, dispatch]);
 
-  const { mintInfos: unfilteredMintInfos, endorsements: unfilteredReviews } =
+  const { mintInfos: unfilteredMintInfos, reviews: unfilteredReviews } =
     useSelector((state: RootState) => state.nip87);
 
   useEffect(() => {
     const filteredMintInfos = unfilteredMintInfos.filter((mint) => {
-      const avgRating = mint.totalRatings / mint.numRecsWithRatings;
+      const avgRating = mint.totalRatings / mint.reviewsWithRating;
       if (avgRating < filters.mints.minRating) {
         return false;
       }
-      if (mint.numRecommendations < filters.mints.minRecs) {
+      if (mint.numReviews < filters.mints.minReviews) {
         return false;
       }
       return true;
@@ -176,8 +176,8 @@ const MintTable = () => {
   }, [unfilteredReviews, filters.reviews, following, mintUrlToShow]);
 
   useEffect(() => {
-    dispatch(setMintsFilter({ minRecs, minRating }));
-  }, [minRecs, minRating]);
+    dispatch(setMintsFilter({ minReviews, minRating }));
+  }, [minReviews, minRating]);
 
   useEffect(() => {
     dispatch(setReviewsFilter({ friends: onlyFriends }));
@@ -221,11 +221,11 @@ const MintTable = () => {
                   )
                   .sort((a, b) => {
                     const aRating =
-                      a.numRecsWithRatings *
-                        (a.totalRatings / a.numRecsWithRatings / 5) || 0;
+                      a.reviewsWithRating *
+                        (a.totalRatings / a.reviewsWithRating / 5) || 0;
                     const bRating =
-                      b.numRecsWithRatings *
-                        (b.totalRatings / b.numRecsWithRatings / 5) || 0;
+                      b.reviewsWithRating *
+                        (b.totalRatings / b.reviewsWithRating / 5) || 0;
                     if (!ratingSort) return 0;
                     if (ratingSort === "asc") {
                       return aRating - bRating;
@@ -272,7 +272,7 @@ const MintTable = () => {
                     reviewsPage * maxPerPage
                   )
                   .map((review, idx) => (
-                    <TableRowEndorsement endorsement={review} key={idx} />
+                    <TableRowEndorsement review={review} key={idx} />
                   ))}
               </Table.Body>
             </Table>
