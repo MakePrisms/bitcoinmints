@@ -4,12 +4,16 @@ import ReviewMintButton from "@/components/ReviewMintButton";
 import ListMintButton from "@/components/ListMintButton";
 import MintTable from "@/components/MintTable";
 import Footer from "@/components/Footer";
+import Head from "next/head";
 
 const inter = Inter({ subsets: ["latin"] });
 
 export default function Home() {
   return (
     <>
+     <Head>
+        <title>Bitcoin Mints</title>
+      </Head>
       <header>
         <Header />
       </header>
