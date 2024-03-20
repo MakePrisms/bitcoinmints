@@ -54,7 +54,7 @@ const MintFilters = ({
         <form className="flex flex-col md:flex-row md:justify-start text-gray-400 text-sm">
           <div className="mb-5 ml-3 md:mr-5">
             <div className="mb-1 block">
-              <label htmlFor="num-recs-slider">Total reviews</label>
+              <label htmlFor="num-recs-slider">Total Reviews</label>
             </div>
             <div className="flex">
               <RangeSlider
@@ -87,7 +87,7 @@ const MintFilters = ({
           </div>
           <div className="mb-5 ml-3 md:mr-5">
             <div>
-              <label htmlFor="only-friends-checkbox">Connection Review</label>
+              <label htmlFor="only-friends-checkbox">Connections</label>
             </div>
             <div>
               <Checkbox

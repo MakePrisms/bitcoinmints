@@ -180,7 +180,7 @@ const MintTable = () => {
             <Table className="overflow-x-auto">
               <Table.Head>
                 <Table.HeadCell>Mint</Table.HeadCell>
-                <Table.HeadCell>Avg. Rating</Table.HeadCell>
+                <Table.HeadCell>Rating</Table.HeadCell>
                 <Table.HeadCell>URL</Table.HeadCell>
                 <Table.HeadCell>Supported Nuts</Table.HeadCell>
                 <Table.HeadCell>
