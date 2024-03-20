@@ -34,7 +34,7 @@ const MintTable = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [mintUrlToShow, setMintUrlToShow] = useState<string | undefined>();
   const tabsRef = useRef<TabsRef>(null);
-  const [ratingSort, setRatingSort] = useState<"asc" | "desc" | undefined>();
+  const [ratingSort, setRatingSort] = useState<"asc" | "desc" | undefined>('desc');
 
   const router = useRouter();
 
