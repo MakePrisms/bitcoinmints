@@ -2,7 +2,7 @@ import { Button } from "flowbite-react";
 import { useNdk } from "@/hooks/useNdk";
 import { useState } from "react";
 import { getMintInfo } from "@/utils/cashu";
-import ListReviewModal from "./ListReviewModal";
+import ListReviewModal from "../modals/ListReviewModal";
 import { Nip87MintInfo, Nip87ReccomendationData } from "@/types";
 import { nip87Reccomendation } from "@/utils/nip87";
 import { useDispatch, useSelector } from "react-redux";

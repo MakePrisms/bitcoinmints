@@ -2,7 +2,7 @@ import { useDispatch, useSelector } from "react-redux";
 import { Rating, Table, Tooltip } from "flowbite-react";
 import { HiTrash } from "react-icons/hi";
 import { BsClipboard2, BsClipboard2CheckFill } from "react-icons/bs";
-import NostrProfile from "./NostrProfile";
+import NostrProfile from "../NostrProfile";
 import { Nip87MintReccomendation } from "@/types";
 import { RootState } from "@/redux/store";
 import { useNdk } from "@/hooks/useNdk";

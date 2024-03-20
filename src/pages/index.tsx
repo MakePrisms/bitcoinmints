@@ -1,8 +1,8 @@
 import { Inter } from "next/font/google";
 import Header from "@/components/Header";
-import ReviewMintButton from "@/components/ReviewMintButton";
-import ListMintButton from "@/components/ListMintButton";
-import MintTable from "@/components/MintTable";
+import ReviewMintButton from "@/components/buttons/ReviewMintButton";
+import ListMintButton from "@/components/buttons/ListMintButton";
+import MintTable from "@/components/mainTable/MintTable";
 import Footer from "@/components/Footer";
 import Head from "next/head";
 

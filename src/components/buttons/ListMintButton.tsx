@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { getMintInfo } from "@/utils/cashu";
 import { Button } from "flowbite-react";
-import ListReviewModal from "./ListReviewModal";
+import ListReviewModal from "../modals/ListReviewModal";
 import { nip87Info } from "@/utils/nip87";
 import { useNdk } from "@/hooks/useNdk";
 import { MintData, Nip87MintTypes } from "@/types";

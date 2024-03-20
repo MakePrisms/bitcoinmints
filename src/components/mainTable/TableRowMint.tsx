@@ -6,7 +6,7 @@ import { useNdk } from "@/hooks/useNdk";
 import { useDispatch, useSelector } from "react-redux";
 import { RootState } from "@/redux/store";
 import { deleteMintInfo } from "@/redux/slices/nip87Slice";
-import ReviewMintButton from "./ReviewMintButton";
+import ReviewMintButton from "../buttons/ReviewMintButton";
 import { copyToClipboard, shortenString } from "@/utils";
 import { useRouter } from "next/router";
 
