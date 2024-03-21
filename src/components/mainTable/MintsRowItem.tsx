@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Rating, Table, Tooltip } from "flowbite-react";
 import { BsClipboard2, BsClipboard2CheckFill, BsTrash } from "react-icons/bs";
 import { Nip87MintInfo } from "@/types";
@@ -13,6 +13,7 @@ import { useRouter } from "next/router";
 const MintsRowItem = ({ mint }: { mint: Nip87MintInfo }) => {
   const [copied, setCopied] = useState(false);
   const [show, setShow] = useState(false);
+  const [avgRating, setAvgRating] = useState(0);
 
   const router = useRouter();
 
@@ -39,6 +40,13 @@ const MintsRowItem = ({ mint }: { mint: Nip87MintInfo }) => {
     setTimeout(() => setCopied(false), 3000);
   };
 
+  useEffect(() => {
+    if (mint.totalRatings) {
+      const avgRating = mint.totalRatings / mint.reviewsWithRating;
+      setAvgRating(Number(avgRating.toFixed(2)));
+    }
+  }, [mint.totalRatings, mint.reviewsWithRating])
+
   const handleReviewsClick = () => {
     router.push(
       {
@@ -64,7 +72,7 @@ const MintsRowItem = ({ mint }: { mint: Nip87MintInfo }) => {
                 <Rating>
                   <Rating.Star />
                   &nbsp;
-                  {mint.totalRatings / mint.reviewsWithRating || "No reviews"}
+                  {avgRating || "No reviews"}
                 &nbsp;&middot;&nbsp;
                 </Rating>
                 <div
