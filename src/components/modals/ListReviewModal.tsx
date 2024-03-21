@@ -228,7 +228,7 @@ const ListReviewModal = ({
   const submitText = type === "review" ? "Publish Review" : "Publish Listing";
   return (
     <Modal show={show} onClose={onClose} size="md" popup>
-      <Modal.Header className="mb-3">
+      <Modal.Header className="m-3">
         <h3 className="text-2xl font-medium">{title}</h3>
       </Modal.Header>
       <Modal.Body>
