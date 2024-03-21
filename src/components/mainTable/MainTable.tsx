@@ -3,7 +3,7 @@ import { useSelector } from "react-redux";
 import { useEffect, useRef, useState } from "react";
 import NDK, { NDKEvent, NDKFilter } from "@nostr-dev-kit/ndk";
 import { useNdk } from "@/hooks/useNdk";
-import { Nip87Kinds, Nip87MintInfo, Nip87MintReccomendation } from "@/types";
+import { Nip87Kinds, Nip87MintInfo, Nip87MintReccomendation, Nip87MintTypes } from "@/types";
 import { RootState, useAppDispatch } from "@/redux/store";
 import {
   addMintInfosAsync,
@@ -86,8 +86,7 @@ const MintTable = () => {
       undefined,
       { shallow: true }
     );
-
-    //always reset page to 1 when changing tabs
+    
     setMintsPage(1);
     setReviewsPage(1);
   };
@@ -100,6 +99,11 @@ const MintTable = () => {
     );
   };
 
+  useEffect(() => {
+    setMintsPage(1);
+    setReviewsPage(1);
+  }, [minReviews, minRating, onlyFriends, showCashu, showFedimint]);
+  
   useEffect(() => {
     if (router.query.tab) {
       tabsRef.current?.setActiveTab(router.query.tab === "mints" ? 0 : 1);
@@ -115,7 +119,7 @@ const MintTable = () => {
 
     const mintSub = ndk.subscribe(
       {
-        kinds: [Nip87Kinds.CashuInfo],
+        kinds: [Nip87Kinds.CashuInfo, Nip87Kinds.FediInfo],
       } as unknown as NDKFilter,
       { closeOnEose: false }
     );
@@ -170,6 +174,14 @@ const MintTable = () => {
         return false;
       }
 
+      if (!filters.reviews.showCashu && review.mintType === Nip87MintTypes.Cashu) {
+        return false;
+      }
+
+      if (!filters.reviews.showFedimint && review.mintType === Nip87MintTypes.Fedimint) {
+        return false;
+      }
+
       return true;
     });
     setReviews(filteredReviews);
@@ -180,8 +192,8 @@ const MintTable = () => {
   }, [minReviews, minRating]);
 
   useEffect(() => {
-    dispatch(setReviewsFilter({ friends: onlyFriends }));
-  }, [onlyFriends]);
+    dispatch(setReviewsFilter({ friends: onlyFriends, showCashu, showFedimint }));
+  }, [onlyFriends, showCashu, showFedimint]);
 
   return (
     <div className="w-full">

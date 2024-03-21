@@ -35,6 +35,10 @@ const MintsRowItem = ({ mint }: { mint: Nip87MintInfo }) => {
   };
 
   const handleCopy = () => {
+    if (!mint.mintUrl) {
+      alert("No mint url found");
+      return;
+    }
     copyToClipboard(mint.mintUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 3000);
@@ -93,7 +97,7 @@ const MintsRowItem = ({ mint }: { mint: Nip87MintInfo }) => {
         {/*  Mint Url */}
         <Table.Cell className="hover:cursor-pointer" onClick={handleCopy}>
           <div className="flex">
-            {shortenString(mint.mintUrl)}
+            {shortenString(mint.mintUrl || "not found")}
             {copied ? (
               <BsClipboard2CheckFill className="ml-1 mt-1" size={15} />
             ) : (

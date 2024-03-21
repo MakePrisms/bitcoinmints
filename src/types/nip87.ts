@@ -12,7 +12,8 @@ export enum Nip87MintTypes {
 }
 
 export type Nip87MintInfo = {
-  mintUrl: string;
+  mintUrl?: string;
+  inviteCodes?: string[];
   appPubkey: string;
   rawEvent: NostrEvent;
   mintName: string;
@@ -30,8 +31,9 @@ export function isNip87MintInfo(mint: Nip87MintInfo | Nip87ReccomendationData): 
 } 
 
 export type Nip87MintReccomendation = {
-  mintType: Nip87MintTypes.Cashu;
-  mintUrl: string;
+  mintType: Nip87MintTypes.Cashu | Nip87MintTypes.Fedimint;
+  mintUrl?: string;
+  inviteCodes?: string[];
   userPubkey: string;
   rawEvent: NostrEvent;
   mintName: string;

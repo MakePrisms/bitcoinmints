@@ -30,67 +30,102 @@ const fetchMintInfoCache = new Map<string, MintData | Promise<MintData>>();
 
 const getMintInfoWithCache = async (url: string) => {
   if (!fetchMintInfoCache.has(url)) {
-    fetchMintInfoCache.set(url, getMintInfo(url).then(data => data). catch(e => {
-      fetchMintInfoCache.delete(url);
-      console.error("Error fetching mint url", e);
-      throw e;
-    }));
+    fetchMintInfoCache.set(
+      url,
+      getMintInfo(url)
+        .then((data) => data)
+        .catch((e) => {
+          fetchMintInfoCache.delete(url);
+          console.error("Error fetching mint url", e);
+          throw e;
+        })
+    );
   }
 
   return fetchMintInfoCache.get(url)!;
-}
+};
 
 export const addMintInfosAsync = createAsyncThunk(
-  'nip87/addMint',
-  async ({ event, relay }: { event: NostrEvent; relay?: string }, {getState, dispatch }) => {
-    const mintUrls = event.tags.filter((tag) => tag[0] === "u").map((tag) => tag[1]);
+  "nip87/addMint",
+  async (
+    { event, relay }: { event: NostrEvent; relay?: string },
+    { getState, dispatch }
+  ) => {
+    const mintUrls = event.tags
+      .filter((tag) => tag[0] === "u")
+      .map((tag) => tag[1]);
 
-    if (mintUrls.length > 1) throw new Error("Multiple mint urls in one mint info event");
+    if (mintUrls.length > 1)
+      throw new Error("Multiple mint urls in one mint info event");
 
     const state = getState() as RootState;
-    const fetchedMint = state.nip87.mints.find((mint) => mint.url === mintUrls[0]);
+    const fetchedMint = state.nip87.mints.find(
+      (mint) => mint.url === mintUrls[0]
+    );
 
     let mintName = "";
     if (fetchedMint) {
       mintName = fetchedMint.name;
     } else {
-      const mintData = await getMintInfoWithCache(mintUrls[0])
-      const {name} = mintData;
+      const mintData = await getMintInfoWithCache(mintUrls[0]);
+      const { name } = mintData;
       dispatch(addMintData(mintData));
       mintName = name;
     }
 
     dispatch(addMint({ event, relay, mintName }));
-  })
+  }
+);
 
 export const addReviewAsync = createAsyncThunk(
-  'nip87/addReview',
-  async ({ event, infoEventRelay }: { event: NostrEvent; infoEventRelay?: string }, {getState, dispatch }) => {
-    const mintUrls = event.tags.filter((tag) => tag[0] === "u" && tag[2] === "cashu").map((tag) => tag[1]);
+  "nip87/addReview",
+  async (
+    { event, infoEventRelay }: { event: NostrEvent; infoEventRelay?: string },
+    { getState, dispatch }
+  ) => {
+    if (event.tags.find((tag) => tag[0] === "k" && tag[1] === "38173")) {
+      const inviteCodes = event.tags
+        .filter((tag) => tag[0] === "u")
+        .map((tag) => tag[1]);
+      const modules = event.tags
+        .find((tag) => tag[0] === "modules")?.[1]
+        ?.split(",");
+      dispatch(
+        addReview({
+          event,
+          mintNameMap: [{ mintName: "Fedimint", inviteCodes }],
+        })
+      );
+    }
+
+    const mintUrls = event.tags
+      .filter((tag) => tag[0] === "u" && tag[2] === "cashu")
+      .map((tag) => tag[1]);
 
     const state = getState() as RootState;
-    const fetchedMints = state.nip87.mints.filter((mint) => mintUrls.includes(mint.url));
+    const fetchedMints = state.nip87.mints.filter((mint) =>
+      mintUrls.includes(mint.url)
+    );
 
     const mintNameMap = [];
     for (const mintUrl of mintUrls) {
-      const fetchedMint = fetchedMints.find((mint) => mint.url === mintUrl); 
+      const fetchedMint = fetchedMints.find((mint) => mint.url === mintUrl);
       let mintName = "";
       if (fetchedMint) {
         mintName = fetchedMint.name;
       } else {
-        const mintData = await getMintInfoWithCache(mintUrls[0])
-        const {name} = mintData;
+        const mintData = await getMintInfoWithCache(mintUrls[0]);
+        const { name } = mintData;
         dispatch(addMintData(mintData));
         mintName = name;
       }
 
-      mintNameMap.push({mintUrl, mintName});
+      mintNameMap.push({ mintUrl, mintName });
     }
 
     dispatch(addReview({ event, infoEventRelay, mintNameMap }));
   }
-
-)
+);
 
 const nip87Slice = createSlice({
   name: "nip87",
@@ -100,7 +135,12 @@ const nip87Slice = createSlice({
       if (state.mints.find((mint) => mint.url === action.payload.url)) return;
       state.mints = [...state.mints, action.payload];
     },
-    addMint(state, action: { payload: { event: NostrEvent; relay?: string, mintName: string  } }) {
+    addMint(
+      state,
+      action: {
+        payload: { event: NostrEvent; relay?: string; mintName: string };
+      }
+    ) {
       const mintUrls = action.payload.event.tags
         .filter((tag) => tag[0] === "u")
         .map((tag) => tag[1]);
@@ -109,9 +149,7 @@ const nip87Slice = createSlice({
 
       mintUrls.forEach((mintUrl) => {
         const exists = state.mintInfos.find(
-          (mint) =>
-            `${mint.mintUrl}` ===
-            `${mintUrl}`
+          (mint) => `${mint.mintUrl}` === `${mintUrl}`
         );
 
         if (!exists) {
@@ -122,11 +160,18 @@ const nip87Slice = createSlice({
               mintName: action.payload.mintName,
               appPubkey: action.payload.event.pubkey,
               rawEvent: action.payload.event,
-              supportedNuts: action.payload.event.tags.find(t => t[0] === "nuts")?.[1],
+              supportedNuts: action.payload.event.tags.find(
+                (t) => t[0] === "nuts"
+              )?.[1],
               relay: action.payload.relay,
-              numReviews: state.reviews.filter(e => e.mintUrl === mintUrl).length,
-              totalRatings: state.reviews.filter(e => e.mintUrl === mintUrl).reduce((acc, e) => acc + (e.rating || 0), 0),
-              reviewsWithRating: state.reviews.filter(e => e.mintUrl === mintUrl).filter(e => e.rating).length,
+              numReviews: state.reviews.filter((e) => e.mintUrl === mintUrl)
+                .length,
+              totalRatings: state.reviews
+                .filter((e) => e.mintUrl === mintUrl)
+                .reduce((acc, e) => acc + (e.rating || 0), 0),
+              reviewsWithRating: state.reviews
+                .filter((e) => e.mintUrl === mintUrl)
+                .filter((e) => e.rating).length,
             },
           ];
         }
@@ -134,27 +179,34 @@ const nip87Slice = createSlice({
     },
     addReview(
       state,
-      action: { payload: { event: NostrEvent; mintNameMap: {mintUrl: string; mintName: string;}[], infoEventRelay?: string } }
+      action: {
+        payload: {
+          event: NostrEvent;
+          mintNameMap: {
+            mintUrl?: string;
+            inviteCodes?: string[];
+            mintName: string;
+          }[];
+          infoEventRelay?: string;
+        };
+      }
     ) {
       if (action.payload.event.kind !== Nip87Kinds.Reccomendation) return;
-
-      const mintUrls = action.payload.event.tags
-        .filter((tag) => tag[0] === "u" && tag[2] === "cashu")
-        .map((tag) => tag[1]);
 
       const rating = action.payload.event.content.match(/\[(\d)\/5\]/)?.[1];
       const review = action.payload.event.content.replace(/\[(\d)\/5\]/, "");
 
-      if (mintUrls.length === 0) return;
-
-      mintUrls.forEach((mintUrl) => {
+      if (action.payload.mintNameMap[0].mintUrl) {
+        const mintUrl = action.payload.mintNameMap[0].mintUrl;
         const exists = state.reviews.find(
           (r) =>
             `${r.mintUrl}${r.userPubkey}` ===
             `${mintUrl}${action.payload.event.pubkey}`
         );
 
-        const mintName = action.payload.mintNameMap.find(m => m.mintUrl === mintUrl)?.mintName!;
+        const mintName = action.payload.mintNameMap.find(
+          (m) => m.mintUrl === mintUrl
+        )?.mintName!;
 
         if (!exists) {
           state.reviews = [
@@ -171,28 +223,55 @@ const nip87Slice = createSlice({
             },
           ];
           // update the mint info with new review data
-          const mintInfo = state.mintInfos.find(m => m.mintUrl === mintUrl);
+          const mintInfo = state.mintInfos.find((m) => m.mintUrl === mintUrl);
           if (mintInfo) {
             mintInfo.numReviews = mintInfo.numReviews + 1;
-            mintInfo.totalRatings = mintInfo.totalRatings + (rating ? parseInt(rating) : 0);
-            mintInfo.reviewsWithRating = mintInfo.reviewsWithRating + (rating ? 1 : 0);
+            mintInfo.totalRatings =
+              mintInfo.totalRatings + (rating ? parseInt(rating) : 0);
+            mintInfo.reviewsWithRating =
+              mintInfo.reviewsWithRating + (rating ? 1 : 0);
             // update the mint info in the state
-            state.mintInfos = state.mintInfos.map(m => m.mintUrl === mintUrl ? mintInfo : m);
+            state.mintInfos = state.mintInfos.map((m) =>
+              m.mintUrl === mintUrl ? mintInfo : m
+            );
           }
         }
-      });
+      } else if (action.payload.mintNameMap[0].inviteCodes) {
+        const inviteCodes = action.payload.mintNameMap[0].inviteCodes!;
+        const exists = state.reviews.find((r) => {
+          return r.rawEvent.id === action.payload.event.id;
+        });
+        if (!exists) {
+          state.reviews = [
+            ...state.reviews,
+            {
+              mintType: Nip87MintTypes.Fedimint,
+              inviteCodes,
+              mintName: action.payload.mintNameMap[0].mintName,
+              rating: rating ? parseInt(rating) : undefined,
+              review,
+              userPubkey: action.payload.event.pubkey,
+              rawEvent: action.payload.event,
+              mintInfoEventRelay: action.payload.infoEventRelay,
+            },
+          ];
+        }
+      }
     },
     deleteReview(state, action: { payload: string }) {
       state.reviews = state.reviews.filter(
-        (r) =>
-          `${r.mintUrl}${r.userPubkey}` !== action.payload
+        (r) => `${r.mintUrl}${r.userPubkey}` !== action.payload
       );
-      const mintInfo = state.mintInfos.find(m => m.mintUrl === action.payload);
+      const mintInfo = state.mintInfos.find(
+        (m) => m.mintUrl === action.payload
+      );
       if (mintInfo) {
         mintInfo.numReviews = mintInfo.numReviews - 1;
         //TODO: decrement totalRatings and reviewsWithRating
         // update the mint info in the state
-        state.mintInfos = state.mintInfos.map(m => m.mintUrl === action.payload ? mintInfo : m);
+        state.mintInfos = state.mintInfos.map((m) =>
+          m.mintUrl === action.payload ? mintInfo : m
+        );
       }
     },
     deleteMintInfo(state, action: { payload: string }) {
@@ -204,10 +283,5 @@ const nip87Slice = createSlice({
 });
 
 export default nip87Slice.reducer;
-export const {
-  addMintData,
-  addMint,
-  addReview,
-  deleteReview,
-  deleteMintInfo,
-} = nip87Slice.actions;
+export const { addMintData, addMint, addReview, deleteReview, deleteMintInfo } =
+  nip87Slice.actions;

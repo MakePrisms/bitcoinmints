@@ -108,9 +108,8 @@ const MintFilters = ({
               <Checkbox
                 id="mint-type-cashu"
                 checked={showCashu}
-                onChange={(e) => setShowCashu(true)}
+                onChange={(e) => setShowCashu(!showCashu)}
                 className="mr-2"
-                disabled
               />
               <label htmlFor="mint-type-cashu">Cashu</label>
             </div>
@@ -118,9 +117,8 @@ const MintFilters = ({
               <Checkbox
                 id="mint-type-fedi"
                 checked={showFedimint}
-                onChange={(e) => setShowFedimint(false)}
+                onChange={(e) => setShowFedimint(!showFedimint)}
                 className="mr-2"
-                disabled
               />
               <label htmlFor="mint-type-fedi">Fedimint</label>
             </div>
