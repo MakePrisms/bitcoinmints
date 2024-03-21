@@ -63,16 +63,22 @@ export const nip87Info = async (
 export const nip87Reccomendation = async (
   ndk: NDK,
   mint: Nip87MintInfo | Nip87ReccomendationData,
+  mintType: Nip87MintTypes,
   rating?: number,
   review?: string
 ): Promise<NDKEvent> => {
-  if (!mint.mintUrl) {
-    throw new Error("fedimint mint type not supported");
-  }
+  const infoKind = mintType === Nip87MintTypes.Cashu ? Nip87Kinds.CashuInfo : Nip87Kinds.FediInfo;
   let tags: NDKTag[] = [
-    ["k", Nip87Kinds.CashuInfo.toString()],
-    ["u", mint.mintUrl, "cashu"],
+    ["k", infoKind.toString()],
   ];
+
+  if (mint.mintUrl) {
+    tags.push(["u", mint.mintUrl, mintType]);
+  }
+
+  if (mint.inviteCodes) {
+    tags.push(...mint.inviteCodes.map((code) => ["u", code, mintType]))
+  }
 
   if (isNip87MintInfo(mint)) {
     const identifier = mint.rawEvent.tags.find((tag) => tag[0] === "d")?.[1] || mint.mintPubkey;
@@ -88,6 +94,10 @@ export const nip87Reccomendation = async (
     const dTag = ["d", identifier];
     tags.push(aTag);
     tags.push(dTag);
+  } else {
+    if (mint.mintPubkey) {
+      tags.push(["d", mint.mintPubkey]);
+    }
   }
 
   let content = "";

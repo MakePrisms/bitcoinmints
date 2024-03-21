@@ -44,8 +44,9 @@ export type Nip87MintReccomendation = {
 };
 
 export type Nip87ReccomendationData = {
-  mintUrl: string;
+  mintUrl?: string;
   supportedNuts: string;
   mintName: string;
   mintPubkey?: string;
+  inviteCodes?: string[];
 }
