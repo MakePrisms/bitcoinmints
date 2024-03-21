@@ -34,7 +34,7 @@ export const nip87Info = async (
   let tags: NDKTag[] = [];
   if (mintType === Nip87MintTypes.Fedimint) {
     if (inviteCodes && inviteCodes.length > 0) {
-      tags.push(...inviteCodes.map((code) => ["u", code, mintType]));
+      tags.push(...inviteCodes.map((code) => ["u", code.trim(), mintType]));
     }
   } else if (mintType === Nip87MintTypes.Cashu) {
     mintUrl && tags.push(["u", mintUrl, mintType]);
@@ -87,7 +87,7 @@ export const nip87Reccomendation = async (
   }
 
   if (mint.inviteCodes) {
-    tags.push(...mint.inviteCodes.map((code) => ["u", code, mintType]));
+    tags.push(...mint.inviteCodes.map((code) => ["u", code.trim(), mintType]));
   }
 
   if (isNip87MintInfo(mint)) {

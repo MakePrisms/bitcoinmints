@@ -13,7 +13,7 @@ const ReviewMintButton = ({mint, text}: {mint?: Nip87MintInfo, text: string;}) =
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [mintUrl, setMintUrl] = useState(mint?.mintUrl || "");
   const [mintPubkey, setMintPubkey] = useState(mint?.mintPubkey || "");
-  const [inviteCodes, setInviteCodes] = useState<string[]>([]);
+  const [inviteCodes, setInviteCodes] = useState<string[]>(mint?.inviteCodes || []);
   const [rating, setRating] = useState(0);
   const [review, setReview] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
@@ -108,8 +108,8 @@ const ReviewMintButton = ({mint, text}: {mint?: Nip87MintInfo, text: string;}) =
         review={review}
         setReview={setReview}
         isProcessing={isProcessing}
-        inviteCodes={inviteCodes}
-        setInviteCodes={setInviteCodes}
+        inviteCodes={mint?.inviteCodes ? mint?.inviteCodes : inviteCodes}
+        setInviteCodes={mint?.inviteCodes ? () => {} : setInviteCodes}
       />
     </div>
   );

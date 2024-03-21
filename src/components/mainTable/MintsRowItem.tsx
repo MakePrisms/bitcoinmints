@@ -9,10 +9,11 @@ import { deleteMintInfo } from "@/redux/slices/nip87Slice";
 import ReviewMintButton from "../buttons/ReviewMintButton";
 import { copyToClipboard, shortenString } from "@/utils";
 import { useRouter } from "next/router";
+import FediCodesModal from "../modals/FediCodesModal";
 
 const MintsRowItem = ({ mint }: { mint: Nip87MintInfo }) => {
   const [copied, setCopied] = useState(false);
-  const [show, setShow] = useState(false);
+  const [showFediCodesModal, setShowFediCodesModal] = useState(false);
   const [avgRating, setAvgRating] = useState(0);
 
   const router = useRouter();
@@ -30,13 +31,9 @@ const MintsRowItem = ({ mint }: { mint: Nip87MintInfo }) => {
     dispatch(deleteMintInfo(mintInfoId));
   };
 
-  const handleModalClose = () => {
-    setShow(false);
-  };
-
   const handleCopy = () => {
     if (!mint.mintUrl) {
-      alert("No mint url found");
+      setShowFediCodesModal(true);
       return;
     }
     copyToClipboard(mint.mintUrl);
@@ -97,7 +94,7 @@ const MintsRowItem = ({ mint }: { mint: Nip87MintInfo }) => {
         {/*  Mint Url */}
         <Table.Cell className="hover:cursor-pointer" onClick={handleCopy}>
           <div className="flex">
-            {shortenString(mint.mintUrl || "not found")}
+            {shortenString(mint.mintUrl || "Invite Codes")}
             {copied ? (
               <BsClipboard2CheckFill className="ml-1 mt-1" size={15} />
             ) : (
@@ -119,6 +116,7 @@ const MintsRowItem = ({ mint }: { mint: Nip87MintInfo }) => {
           )}
         </Table.Cell>
       </Table.Row>
+      {mint.inviteCodes && <FediCodesModal inviteCodes={mint.inviteCodes!} show={showFediCodesModal} setShow={setShowFediCodesModal} />}
     </>
   );
 };

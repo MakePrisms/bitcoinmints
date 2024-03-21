@@ -9,6 +9,7 @@ import { useNdk } from "@/hooks/useNdk";
 import { deleteReview } from "@/redux/slices/nip87Slice";
 import { copyToClipboard, shortenString } from "@/utils";
 import { useEffect, useState } from "react";
+import FediCodesModal from "../modals/FediCodesModal";
 
 const ReviewCell = ({ review }: { review?: string }) => {
   const [shortened, setShortened] = useState(true);
@@ -119,25 +120,7 @@ const ReviewsRowItem = ({ review }: { review: Nip87MintReccomendation }) => {
           )}
         </Table.Cell>
       </Table.Row>
-      <Modal
-        show={showFediCodesModal}
-        onClose={() => setShowFediCodesModal(false)}
-      >
-        <Modal.Header>Invite Codes</Modal.Header>
-        <Modal.Body>
-          <List>
-            {review.inviteCodes?.map((code, i) => (
-              <List.Item key={i} className="flex">
-                {shortenString(code)}
-                <BsClipboard2
-                  className="hover:cursor-pointer ml-1 mt-1"
-                  onClick={() => copyToClipboard(code)}
-                />
-              </List.Item>
-            ))}
-          </List>
-        </Modal.Body>
-      </Modal>
+      <FediCodesModal inviteCodes={review.inviteCodes!} show={showFediCodesModal} setShow={setShowFediCodesModal}/>
     </>
   );
 };

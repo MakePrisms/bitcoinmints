@@ -147,6 +147,32 @@ const nip87Slice = createSlice({
 
       if (mintUrls.length === 0) return;
 
+      if (action.payload.event.kind === Nip87Kinds.FediInfo) {
+        const exists = state.mintInfos.find(
+          (mint) => `${mint.mintPubkey}` === `${action.payload.event.pubkey}`
+        )
+        if (exists) return;
+        state.mintInfos = [
+          ...state.mintInfos,
+          {
+            mintName: action.payload.mintName,
+            appPubkey: action.payload.event.pubkey,
+            rawEvent: action.payload.event,
+            relay: action.payload.relay,
+            numReviews: state.reviews.filter((e) => e.mintPubkey === action.payload.event.pubkey).length,
+            totalRatings: state.reviews
+              .filter((e) => e.mintPubkey === action.payload.event.pubkey)
+              .reduce((acc, e) => acc + (e.rating || 0), 0),
+            reviewsWithRating: state.reviews
+              .filter((e) => e.mintPubkey === action.payload.event.pubkey)
+              .filter((e) => e.rating).length,
+            mintPubkey: action.payload.event.tags.find((t) => t[0] === "d")?.[1],
+            inviteCodes: action.payload.event.tags.filter((t) => t[0] === "u")?.map((t) => t[1]),
+          },
+        ]
+        return;
+      }
+
       mintUrls.forEach((mintUrl) => {
         const exists = state.mintInfos.find(
           (mint) => `${mint.mintUrl}` === `${mintUrl}`
