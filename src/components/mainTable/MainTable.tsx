@@ -74,8 +74,9 @@ const MintTable = () => {
       newQuery.tab = tabQueryParam;
     }
 
-    if (tab === 0 && router.query.mintUrl) {
+    if (tab === 0 && (router.query.mintUrl || router.query.mintPubkey)) {
       delete newQuery.mintUrl;
+      delete newQuery.mintPubkey;
       setMintUrlToShow(undefined);
     }
 
@@ -115,6 +116,10 @@ const MintTable = () => {
 
     if (router.query.mintUrl) {
       setMintUrlToShow(router.query.mintUrl as string);
+    }
+
+    if (router.query.mintPubkey) {
+      setMintUrlToShow(router.query.mintPubkey as string);
     }
   }, [router.query]);
 
@@ -199,7 +204,7 @@ const MintTable = () => {
         return false;
       }
 
-      if (mintUrlToShow && mintUrlToShow !== review.mintUrl) {
+      if (mintUrlToShow && (mintUrlToShow !== review.mintUrl && mintUrlToShow !== review.mintPubkey)) {
         return false;
       }
 

@@ -49,10 +49,16 @@ const MintsRowItem = ({ mint }: { mint: Nip87MintInfo }) => {
   }, [mint.totalRatings, mint.reviewsWithRating])
 
   const handleReviewsClick = () => {
+    let query: any = { ...router.query, tab: "reviews" };
+    if (mint.mintUrl) {
+      query.mintUrl = mint.mintUrl;
+    } else if (mint.mintPubkey) {
+      query.mintPubkey = mint.mintPubkey;
+    }
     router.push(
       {
         pathname: router.pathname,
-        query: { ...router.query, tab: "reviews", mintUrl: mint.mintUrl },
+        query,
       },
       undefined,
       { shallow: true }

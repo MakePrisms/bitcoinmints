@@ -268,6 +268,7 @@ const nip87Slice = createSlice({
           return r.rawEvent.id === action.payload.event.id;
         });
         if (!exists) {
+          const mintPubkey = action.payload.event.tags.find((t) => t[0] === "d")?.[1];
           state.reviews = [
             ...state.reviews,
             {
@@ -279,8 +280,20 @@ const nip87Slice = createSlice({
               userPubkey: action.payload.event.pubkey,
               rawEvent: action.payload.event,
               mintInfoEventRelay: action.payload.infoEventRelay,
+              mintPubkey,
             },
           ];
+          const mintInfo = state.mintInfos.find(m => m.mintPubkey === mintPubkey);
+          if (mintInfo) {
+            mintInfo.numReviews = mintInfo.numReviews + 1;
+            mintInfo.totalRatings =
+              mintInfo.totalRatings + (rating ? parseInt(rating) : 0);
+            mintInfo.reviewsWithRating =
+              mintInfo.reviewsWithRating + (rating ? 1 : 0);
+            state.mintInfos = state.mintInfos.map((m) =>
+              m.mintPubkey === mintPubkey ? mintInfo : m
+            );
+          }
         }
       }
     },
