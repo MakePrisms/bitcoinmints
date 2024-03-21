@@ -253,7 +253,7 @@ const ListReviewModal = ({
               )}
             </div>
           </Tabs.Item>
-          <Tabs.Item title="Fedimint">
+          <Tabs.Item title="Fedimint" active={inviteCodes !== undefined && inviteCodes.length > 0}>
             <div className="space-y-6">
               {type === "review" ? (
                 <ReviewModalBody
