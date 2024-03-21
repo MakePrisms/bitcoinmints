@@ -105,7 +105,7 @@ const MintsRowItem = ({ mint }: { mint: Nip87MintInfo }) => {
             )}
           </div>
         </Table.Cell>
-        <Table.Cell>{mint.supportedNuts || "not found"}</Table.Cell>
+        <Table.Cell>{mint.supportedNuts || "N/A"}</Table.Cell>
         <Table.Cell>
           {user.pubkey === mint.appPubkey ? (
             <Tooltip content="Attempt to delete">

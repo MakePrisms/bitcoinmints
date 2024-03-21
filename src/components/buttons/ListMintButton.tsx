@@ -12,6 +12,8 @@ import { RootState } from "@/redux/store";
 const ListMintButton = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [mintUrl, setMintUrl] = useState("");
+  const [mintPubkey, setMintPubkey] = useState("");
+  const [inviteCodes, setInviteCodes] = useState<string[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
 
   const mints = useSelector((state: RootState) => state.nip87.mintInfos);
@@ -26,10 +28,29 @@ const ListMintButton = () => {
     setIsModalOpen(false);
     setIsProcessing(false);
     setMintUrl("");
+    setInviteCodes([]);
+    setMintPubkey("");
+  };
+
+  const handleListFedimint = async () => {
+    const mintInfoEvent = await nip87Info(ndk, Nip87MintTypes.Fedimint, {
+      mintPubkey,
+      inviteCodes,
+    });
+
+    console.log("mintInfoEvent", mintInfoEvent.rawEvent());
+    // await mintInfoEvent.publish();
+    dispatch(addMint({ event: mintInfoEvent.rawEvent(), mintName: mintUrl || "Fedimint" }));
+    handleModalClose();
   };
 
   const handleMintSubmit = async () => {
-    const mintExists = mints.find((mint) => mint.mintUrl === mintUrl);
+    const mintExists = mints.find((mint) => {
+      if (mint.mintPubkey === mintPubkey) {
+        return true;
+      }
+      return mint.mintUrl === mintUrl;
+    });
 
     if (mintExists) {
       alert("Mint already listed");
@@ -38,27 +59,25 @@ const ListMintButton = () => {
 
     setIsProcessing(true);
 
+    if (!mintUrl && mintPubkey && inviteCodes) {
+      return await handleListFedimint();
+    }
+
     try {
       let mintToList: MintData;
       if (mintData.find((mint) => mint.url === mintUrl)) {
         mintToList = mintData.find((mint) => mint.url === mintUrl)!;
       } else {
         mintToList = await getMintInfo(mintUrl)
-        .then((res) => res)
-        .catch(() => {
-          setIsProcessing(false);
-          alert("Error: Could not find mint");
-          throw new Error("Could not find mint");
-        });
+          .then((res) => res)
+          .catch(() => {
+            setIsProcessing(false);
+            alert("Error: Could not find mint");
+            throw new Error("Could not find mint");
+          });
         dispatch(addMintData(mintToList));
       }
-      const {
-        supportedNuts,
-        v0,
-        v1,
-        pubkey,
-        name: mintName,
-      } = mintToList;
+      const { supportedNuts, v0, v1, pubkey, name: mintName } = mintToList;
 
       if (!pubkey)
         alert(
@@ -96,6 +115,10 @@ const ListMintButton = () => {
         setMintUrl={setMintUrl}
         type="claim"
         isProcessing={isProcessing}
+        mintPubkey={mintPubkey}
+        setMintPubkey={setMintPubkey}
+        inviteCodes={inviteCodes}
+        setInviteCodes={setInviteCodes}
       />
     </div>
   );

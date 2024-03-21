@@ -9,6 +9,41 @@ import {
   Tabs,
 } from "flowbite-react";
 
+interface FediListingModalBodyProps {
+  mintPubkey: string;
+  setMintPubkey: (pubkey: string) => void;
+  inviteCodes?: string[];
+  setInviteCodes?: (codes: string[]) => void;
+}
+
+const FediListingModalBody = ({mintPubkey, setMintPubkey, inviteCodes, setInviteCodes}: FediListingModalBodyProps) => (
+  <>
+    <div>
+      <div className="mb-2 block">
+        <Label>Mint Pubkey</Label>
+      </div>
+      <TextInput
+        placeholder="ae042fe2b1..."
+        id="mint-pubkey"
+        value={mintPubkey}
+        onChange={(e) => setMintPubkey(e.target.value)}
+        required
+      />
+    </div>
+    <div>
+      <div className="mb-2 block">
+        <Label>Invite Codes</Label>
+      </div>
+      <Textarea
+        placeholder="fedxyz..., fedabc..., fed123..."
+        id="invite-codes"
+        value={inviteCodes?.join(',')}
+        onChange={(e) => setInviteCodes!(e.target.value.split(','))}
+      />
+    </div>
+  </>
+)
+
 interface CashuListingModalBodyProps {
   mintUrl: string;
   setMintUrl: (url: string) => void;
@@ -233,7 +268,12 @@ const ListReviewModal = ({
                   setInviteCodes={setInviteCodes}
                 />
               ) : (
-                <div />
+                <FediListingModalBody 
+                  mintPubkey={mintPubkey}
+                  setMintPubkey={setMintPubkey}
+                  inviteCodes={inviteCodes}
+                  setInviteCodes={setInviteCodes}
+                />
               )}
             </div>
           </Tabs.Item>

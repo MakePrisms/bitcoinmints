@@ -13,32 +13,41 @@ import NDK, {
 } from "@nostr-dev-kit/ndk";
 
 export type Nip87InfoEventOpts = {
-  mintUrl: string;
-  supportedNuts: string;
+  mintUrl?: string;
+  supportedNuts?: string;
   mintPubkey?: string;
   kind0Metadata?: NDKUserProfile;
+  inviteCodes?: string[];
 };
 
 export const nip87Info = async (
   ndk: NDK,
   mintType: Nip87MintTypes,
-  { mintUrl, mintPubkey, kind0Metadata, supportedNuts }: Nip87InfoEventOpts
+  {
+    mintUrl,
+    mintPubkey,
+    kind0Metadata,
+    supportedNuts,
+    inviteCodes,
+  }: Nip87InfoEventOpts
 ): Promise<NDKEvent> => {
+  let tags: NDKTag[] = [];
   if (mintType === Nip87MintTypes.Fedimint) {
-    throw new Error("fedimint mint type not supported");
+    if (inviteCodes && inviteCodes.length > 0) {
+      tags.push(...inviteCodes.map((code) => ["u", code, mintType]));
+    }
+  } else if (mintType === Nip87MintTypes.Cashu) {
+    mintUrl && tags.push(["u", mintUrl, mintType]);
+    supportedNuts && tags.push(["nuts", supportedNuts]);
   }
 
-  const content = kind0Metadata ? JSON.stringify(kind0Metadata) : "";
-
-  const tags: NDKTag[] = [
-    ["u", mintUrl],
-    ["nuts", supportedNuts],
-  ];
   mintPubkey && tags.push(["d", mintPubkey]);
   console.log("TAGS", tags);
 
+  const content = kind0Metadata ? JSON.stringify(kind0Metadata) : "";
+
   const event = new NDKEvent(ndk, {
-    kind: Nip87Kinds.CashuInfo,
+    kind: mintType === Nip87MintTypes.Cashu ? Nip87Kinds.CashuInfo : Nip87Kinds.FediInfo,
     content: content,
     tags: tags,
   } as NostrEvent);
@@ -67,21 +76,23 @@ export const nip87Reccomendation = async (
   rating?: number,
   review?: string
 ): Promise<NDKEvent> => {
-  const infoKind = mintType === Nip87MintTypes.Cashu ? Nip87Kinds.CashuInfo : Nip87Kinds.FediInfo;
-  let tags: NDKTag[] = [
-    ["k", infoKind.toString()],
-  ];
+  const infoKind =
+    mintType === Nip87MintTypes.Cashu
+      ? Nip87Kinds.CashuInfo
+      : Nip87Kinds.FediInfo;
+  let tags: NDKTag[] = [["k", infoKind.toString()]];
 
   if (mint.mintUrl) {
     tags.push(["u", mint.mintUrl, mintType]);
   }
 
   if (mint.inviteCodes) {
-    tags.push(...mint.inviteCodes.map((code) => ["u", code, mintType]))
+    tags.push(...mint.inviteCodes.map((code) => ["u", code, mintType]));
   }
 
   if (isNip87MintInfo(mint)) {
-    const identifier = mint.rawEvent.tags.find((tag) => tag[0] === "d")?.[1] || mint.mintPubkey;
+    const identifier =
+      mint.rawEvent.tags.find((tag) => tag[0] === "d")?.[1] || mint.mintPubkey;
     if (!identifier) {
       throw new Error("Mint info event must have a mintPubkey or d tag");
     }
