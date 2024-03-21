@@ -66,6 +66,9 @@ export const nip87Reccomendation = async (
   rating?: number,
   review?: string
 ): Promise<NDKEvent> => {
+  if (!mint.mintUrl) {
+    throw new Error("fedimint mint type not supported");
+  }
   let tags: NDKTag[] = [
     ["k", Nip87Kinds.CashuInfo.toString()],
     ["u", mint.mintUrl, "cashu"],
