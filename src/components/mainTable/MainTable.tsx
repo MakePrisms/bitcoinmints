@@ -10,7 +10,7 @@ import {
   Nip87MintTypes,
 } from "@/types";
 import { RootState, useAppDispatch } from "@/redux/store";
-import { addMintInfosAsync, addReviewAsync } from "@/redux/slices/nip87Slice";
+import { addMint, addMintInfosAsync, addReviewAsync } from "@/redux/slices/nip87Slice";
 import MintsRowItem from "./MintsRowItem";
 import TableRowEndorsement from "./ReviewsRowItem";
 import Filters from "./Filters";
@@ -136,6 +136,11 @@ const MintTable = () => {
     );
 
     mintSub.on("event", (event: NDKEvent) => {
+      if (event.kind === Nip87Kinds.FediInfo) {
+        dispatch(
+          addMint({event: event.rawEvent(), mintName: "Fedimint"})
+        )
+      }
       dispatch(
         addMintInfosAsync({ event: event.rawEvent(), relay: event.relay!.url })
       );
