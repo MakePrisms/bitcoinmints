@@ -3,12 +3,14 @@ import { useSelector } from "react-redux";
 import { useEffect, useRef, useState } from "react";
 import NDK, { NDKEvent, NDKFilter } from "@nostr-dev-kit/ndk";
 import { useNdk } from "@/hooks/useNdk";
-import { Nip87Kinds, Nip87MintInfo, Nip87MintReccomendation, Nip87MintTypes } from "@/types";
-import { RootState, useAppDispatch } from "@/redux/store";
 import {
-  addMintInfosAsync,
-  addReviewAsync,
-} from "@/redux/slices/nip87Slice";
+  Nip87Kinds,
+  Nip87MintInfo,
+  Nip87MintReccomendation,
+  Nip87MintTypes,
+} from "@/types";
+import { RootState, useAppDispatch } from "@/redux/store";
+import { addMintInfosAsync, addReviewAsync } from "@/redux/slices/nip87Slice";
 import MintsRowItem from "./MintsRowItem";
 import TableRowEndorsement from "./ReviewsRowItem";
 import Filters from "./Filters";
@@ -34,7 +36,9 @@ const MintTable = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [mintUrlToShow, setMintUrlToShow] = useState<string | undefined>();
   const tabsRef = useRef<TabsRef>(null);
-  const [ratingSort, setRatingSort] = useState<"asc" | "desc" | undefined>('desc');
+  const [ratingSort, setRatingSort] = useState<"asc" | "desc" | undefined>(
+    "desc"
+  );
 
   const router = useRouter();
 
@@ -86,7 +90,7 @@ const MintTable = () => {
       undefined,
       { shallow: true }
     );
-    
+
     setMintsPage(1);
     setReviewsPage(1);
   };
@@ -103,7 +107,7 @@ const MintTable = () => {
     setMintsPage(1);
     setReviewsPage(1);
   }, [minReviews, minRating, onlyFriends, showCashu, showFedimint]);
-  
+
   useEffect(() => {
     if (router.query.tab) {
       tabsRef.current?.setActiveTab(router.query.tab === "mints" ? 0 : 1);
@@ -159,10 +163,30 @@ const MintTable = () => {
       if (mint.numReviews < filters.mints.minReviews) {
         return false;
       }
+
+      if (
+        !filters.reviews.showCashu &&
+        mint.rawEvent.kind === Nip87Kinds.CashuInfo
+      ) {
+        return false;
+      }
+
+      if (
+        !filters.reviews.showFedimint &&
+        mint.rawEvent.kind === Nip87Kinds.FediInfo
+      ) {
+        return false;
+      }
+
       return true;
     });
     setMintInfos(filteredMintInfos);
-  }, [unfilteredMintInfos, filters.mints]);
+  }, [
+    unfilteredMintInfos,
+    filters.mints,
+    filters.reviews.showFedimint,
+    filters.reviews.showCashu,
+  ]);
 
   useEffect(() => {
     const filteredReviews = unfilteredReviews.filter((review) => {
@@ -174,11 +198,17 @@ const MintTable = () => {
         return false;
       }
 
-      if (!filters.reviews.showCashu && review.mintType === Nip87MintTypes.Cashu) {
+      if (
+        !filters.reviews.showCashu &&
+        review.mintType === Nip87MintTypes.Cashu
+      ) {
         return false;
       }
 
-      if (!filters.reviews.showFedimint && review.mintType === Nip87MintTypes.Fedimint) {
+      if (
+        !filters.reviews.showFedimint &&
+        review.mintType === Nip87MintTypes.Fedimint
+      ) {
         return false;
       }
 
@@ -192,7 +222,9 @@ const MintTable = () => {
   }, [minReviews, minRating]);
 
   useEffect(() => {
-    dispatch(setReviewsFilter({ friends: onlyFriends, showCashu, showFedimint }));
+    dispatch(
+      setReviewsFilter({ friends: onlyFriends, showCashu, showFedimint })
+    );
   }, [onlyFriends, showCashu, showFedimint]);
 
   return (
@@ -205,21 +237,21 @@ const MintTable = () => {
               <Table.Head>
                 <Table.HeadCell>Mint</Table.HeadCell>
                 <Table.HeadCell>
-                  <div  className="flex"> 
-                  <span>Rating</span>&nbsp;
-                  <span
-                    className="hover:cursor-pointer mt-0.5"
-                    onClick={toggleRatingSort}
-                  >
-                    {!ratingSort ? (
-                      <IoIosArrowForward />
+                  <div className="flex">
+                    <span>Rating</span>&nbsp;
+                    <span
+                      className="hover:cursor-pointer mt-0.5"
+                      onClick={toggleRatingSort}
+                    >
+                      {!ratingSort ? (
+                        <IoIosArrowForward />
                       ) : ratingSort === "desc" ? (
                         <IoIosArrowDown />
-                        ) : (
-                          <IoIosArrowUp />
-                          )}
-                  </span>
-                          </div>
+                      ) : (
+                        <IoIosArrowUp />
+                      )}
+                    </span>
+                  </div>
                 </Table.HeadCell>
                 <Table.HeadCell>URL</Table.HeadCell>
                 <Table.HeadCell>Supported Nuts</Table.HeadCell>
