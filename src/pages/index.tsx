@@ -1,15 +1,19 @@
 import { Inter } from "next/font/google";
 import Header from "@/components/Header";
-import ReviewMintButton from "@/components/ReviewMintButton";
-import ListMintButton from "@/components/ListMintButton";
-import MintTable from "@/components/MintTable";
+import ReviewMintButton from "@/components/buttons/ReviewMintButton";
+import ListMintButton from "@/components/buttons/ListMintButton";
+import MainTable from "@/components/mainTable/MainTable";
 import Footer from "@/components/Footer";
+import Head from "next/head";
 
 const inter = Inter({ subsets: ["latin"] });
 
 export default function Home() {
   return (
     <>
+     <Head>
+        <title>Bitcoin Mints</title>
+      </Head>
       <header>
         <Header />
       </header>
@@ -20,7 +24,7 @@ export default function Home() {
           <ListMintButton />
           <ReviewMintButton text="Review a Mint" />
         </div>
-        <MintTable />
+        <MainTable />
       </main>
       <Footer />
     </>

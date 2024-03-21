@@ -6,6 +6,7 @@ interface NDKContextProps {
   setSigner: (signer: NDKSigner) => void;
   removeSigner: () => void;
   fetchUserProfile: (pubkey: string) => Promise<NDKUserProfile | undefined>;
+  fetchFollowingPubkeys: (pubkey: string) => Promise<string[]>;
   attemptDeleteEvent: (event: NostrEvent) => Promise<NDKEvent>;
 }
 
@@ -15,6 +16,7 @@ const NDKContext = createContext<NDKContextProps>({
   removeSigner: () => {},
   fetchUserProfile: async (pubkey: string): Promise<NDKUserProfile> =>
     ({} as NDKUserProfile),
+  fetchFollowingPubkeys: async (pubkey: string): Promise<string[]> => [],
   attemptDeleteEvent: async (event: NostrEvent): Promise<NDKEvent> =>
     ({} as NDKEvent),
 });
@@ -58,6 +60,12 @@ export const NDKProvider = ({ children }: any) => {
     return user.profile;
   };
 
+  const fetchFollowingPubkeys = async (pubkey: string) => {
+    const user = ndk.current.getUser({ pubkey });
+    const following = await user.follows({ closeOnEose: false})
+    return Array.from(following).map((user) => user.pubkey);
+  }
+
   const attemptDeleteEvent = async (event: NostrEvent) => {
     const eventToDelete = new NDKEvent(ndk.current, event)
     const deleted = await eventToDelete.delete("Deleted by user", true);
@@ -70,6 +78,7 @@ export const NDKProvider = ({ children }: any) => {
     setSigner,
     removeSigner,
     fetchUserProfile,
+    fetchFollowingPubkeys,
     attemptDeleteEvent,
   };
 

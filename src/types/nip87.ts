@@ -20,9 +20,9 @@ export type Nip87MintInfo = {
   mintPubkey?: string;
   supportedNuts?: string;
   kind0Metadata?: NDKUserProfile;
-  numRecommendations: number;
+  numReviews: number;
   totalRatings: number;
-  numRecsWithRatings: number;
+  reviewsWithRating: number;
 };
 
 export function isNip87MintInfo(mint: Nip87MintInfo | Nip87ReccomendationData): mint is Nip87MintInfo {

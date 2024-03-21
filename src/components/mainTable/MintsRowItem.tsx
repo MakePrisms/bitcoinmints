@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Rating, Table, Tooltip } from "flowbite-react";
 import { BsClipboard2, BsClipboard2CheckFill, BsTrash } from "react-icons/bs";
 import { Nip87MintInfo } from "@/types";
@@ -6,12 +6,16 @@ import { useNdk } from "@/hooks/useNdk";
 import { useDispatch, useSelector } from "react-redux";
 import { RootState } from "@/redux/store";
 import { deleteMintInfo } from "@/redux/slices/nip87Slice";
-import ReviewMintButton from "./ReviewMintButton";
+import ReviewMintButton from "../buttons/ReviewMintButton";
 import { copyToClipboard, shortenString } from "@/utils";
+import { useRouter } from "next/router";
 
-const TableRowMint = ({ mint }: { mint: Nip87MintInfo }) => {
+const MintsRowItem = ({ mint }: { mint: Nip87MintInfo }) => {
   const [copied, setCopied] = useState(false);
   const [show, setShow] = useState(false);
+  const [avgRating, setAvgRating] = useState(0);
+
+  const router = useRouter();
 
   const user = useSelector((state: RootState) => state.user);
 
@@ -36,6 +40,24 @@ const TableRowMint = ({ mint }: { mint: Nip87MintInfo }) => {
     setTimeout(() => setCopied(false), 3000);
   };
 
+  useEffect(() => {
+    if (mint.totalRatings) {
+      const avgRating = mint.totalRatings / mint.reviewsWithRating;
+      setAvgRating(Number(avgRating.toFixed(2)));
+    }
+  }, [mint.totalRatings, mint.reviewsWithRating])
+
+  const handleReviewsClick = () => {
+    router.push(
+      {
+        pathname: router.pathname,
+        query: { ...router.query, tab: "reviews", mintUrl: mint.mintUrl },
+      },
+      undefined,
+      { shallow: true }
+    );
+  };
+
   return (
     <>
       <Table.Row className="dark:bg-gray-800">
@@ -44,16 +66,28 @@ const TableRowMint = ({ mint }: { mint: Nip87MintInfo }) => {
 
         {/* Average Rating */}
         <Table.Cell>
-          {mint.totalRatings ? (
-            <Rating>
-              <Rating.Star />
-              &nbsp;{mint.totalRatings / mint.numRecsWithRatings || "N/A"}
-              &nbsp;&middot;&nbsp;
-              {mint.numRecsWithRatings} review{mint.numRecsWithRatings > 1 ? "s" : ""}
-            </Rating>
-          ) : (
-            "N/A"
-          )}
+          <div className="flex flex-col md:flex-row">
+            {mint.totalRatings ? (
+              <>
+                <Rating>
+                  <Rating.Star />
+                  &nbsp;
+                  {avgRating || "No reviews"}
+                &nbsp;&middot;&nbsp;
+                </Rating>
+                <div
+                  className="hover:cursor-pointer underline w-fit whitespace-nowrap"
+                  onClick={handleReviewsClick}
+                  
+                >
+                  {mint.reviewsWithRating} review
+                  {mint.reviewsWithRating > 1 ? "s" : ""}
+                </div>
+              </>
+            ) : (
+              "No reviews"
+            )}
+          </div>
         </Table.Cell>
 
         {/*  Mint Url */}
@@ -67,7 +101,7 @@ const TableRowMint = ({ mint }: { mint: Nip87MintInfo }) => {
             )}
           </div>
         </Table.Cell>
-        <Table.Cell>{mint.supportedNuts || "N/A"}</Table.Cell>
+        <Table.Cell>{mint.supportedNuts || "not found"}</Table.Cell>
         <Table.Cell>
           {user.pubkey === mint.appPubkey ? (
             <Tooltip content="Attempt to delete">
@@ -85,4 +119,4 @@ const TableRowMint = ({ mint }: { mint: Nip87MintInfo }) => {
   );
 };
 
-export default TableRowMint;
+export default MintsRowItem;

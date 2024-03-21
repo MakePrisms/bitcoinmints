@@ -2,11 +2,11 @@ import { Button } from "flowbite-react";
 import { useNdk } from "@/hooks/useNdk";
 import { useState } from "react";
 import { getMintInfo } from "@/utils/cashu";
-import ListReviewModal from "./ListReviewModal";
+import ListReviewModal from "../modals/ListReviewModal";
 import { Nip87MintInfo, Nip87ReccomendationData } from "@/types";
 import { nip87Reccomendation } from "@/utils/nip87";
 import { useDispatch, useSelector } from "react-redux";
-import { addMintData, addMintEndorsement } from "@/redux/slices/nip87Slice";
+import { addMintData, addReview } from "@/redux/slices/nip87Slice";
 import { RootState } from "@/redux/store";
 
 const ReviewMintButton = ({mint, text}: {mint?: Nip87MintInfo, text: string;}) => {
@@ -16,7 +16,7 @@ const ReviewMintButton = ({mint, text}: {mint?: Nip87MintInfo, text: string;}) =
   const [review, setReview] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
 
-  const reviews = useSelector((state: RootState) => state.nip87.endorsements);
+  const reviews = useSelector((state: RootState) => state.nip87.reviews);
   const mintData = useSelector((state: RootState) => state.nip87.mints);
   const user = useSelector((state: RootState) => state.user);
 
@@ -42,12 +42,12 @@ const ReviewMintButton = ({mint, text}: {mint?: Nip87MintInfo, text: string;}) =
     }
     
     setIsProcessing(true);
-    let mintToEndorse: Nip87MintInfo | Nip87ReccomendationData;
+    let mintToReview: Nip87MintInfo | Nip87ReccomendationData;
     if (mint) {
-      mintToEndorse = mint;
+      mintToReview = mint;
     } else if (mintData.find((mint) => mint.url === mintUrl)) {
       const {supportedNuts, name: mintName} = mintData.find((mint) => mint.url === mintUrl)!;
-      mintToEndorse = {mintUrl, supportedNuts, mintName};
+      mintToReview = {mintUrl, supportedNuts, mintName};
     } else {
       const mintData = await getMintInfo(mintUrl).then((res) => res).catch(() => {
         setIsProcessing(false);
@@ -57,13 +57,13 @@ const ReviewMintButton = ({mint, text}: {mint?: Nip87MintInfo, text: string;}) =
       dispatch(addMintData(mintData));
       const {supportedNuts, name: mintName} = mintData;
 
-      mintToEndorse = { mintUrl, supportedNuts, mintName };
+      mintToReview = { mintUrl, supportedNuts, mintName };
     }
 
-    const endorsement = await nip87Reccomendation(ndk, mintToEndorse, rating, review);
-    console.log("endorsement", endorsement.rawEvent());
-    dispatch(addMintEndorsement({ event: endorsement.rawEvent(), mintNameMap: [{mintUrl, mintName: mintToEndorse.mintName}]}))
-    await endorsement.publish();
+    const reviewEvent = await nip87Reccomendation(ndk, mintToReview, rating, review);
+    
+    dispatch(addReview({ event: reviewEvent.rawEvent(), mintNameMap: [{mintUrl, mintName: mintToReview.mintName}]}))
+    await reviewEvent.publish();
     handleModalClose();
   };
 
