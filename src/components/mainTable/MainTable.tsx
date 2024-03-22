@@ -3,12 +3,14 @@ import { useSelector } from "react-redux";
 import { useEffect, useRef, useState } from "react";
 import NDK, { NDKEvent, NDKFilter } from "@nostr-dev-kit/ndk";
 import { useNdk } from "@/hooks/useNdk";
-import { Nip87Kinds, Nip87MintInfo, Nip87MintReccomendation } from "@/types";
-import { RootState, useAppDispatch } from "@/redux/store";
 import {
-  addMintInfosAsync,
-  addReviewAsync,
-} from "@/redux/slices/nip87Slice";
+  Nip87Kinds,
+  Nip87MintInfo,
+  Nip87MintReccomendation,
+  Nip87MintTypes,
+} from "@/types";
+import { RootState, useAppDispatch } from "@/redux/store";
+import { addMint, addMintInfosAsync, addReviewAsync } from "@/redux/slices/nip87Slice";
 import MintsRowItem from "./MintsRowItem";
 import TableRowEndorsement from "./ReviewsRowItem";
 import Filters from "./Filters";
@@ -34,7 +36,9 @@ const MintTable = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [mintUrlToShow, setMintUrlToShow] = useState<string | undefined>();
   const tabsRef = useRef<TabsRef>(null);
-  const [ratingSort, setRatingSort] = useState<"asc" | "desc" | undefined>('desc');
+  const [ratingSort, setRatingSort] = useState<"asc" | "desc" | undefined>(
+    "desc"
+  );
 
   const router = useRouter();
 
@@ -70,8 +74,9 @@ const MintTable = () => {
       newQuery.tab = tabQueryParam;
     }
 
-    if (tab === 0 && router.query.mintUrl) {
+    if (tab === 0 && (router.query.mintUrl || router.query.mintPubkey)) {
       delete newQuery.mintUrl;
+      delete newQuery.mintPubkey;
       setMintUrlToShow(undefined);
     }
 
@@ -87,7 +92,6 @@ const MintTable = () => {
       { shallow: true }
     );
 
-    //always reset page to 1 when changing tabs
     setMintsPage(1);
     setReviewsPage(1);
   };
@@ -101,12 +105,21 @@ const MintTable = () => {
   };
 
   useEffect(() => {
+    setMintsPage(1);
+    setReviewsPage(1);
+  }, [minReviews, minRating, onlyFriends, showCashu, showFedimint]);
+
+  useEffect(() => {
     if (router.query.tab) {
       tabsRef.current?.setActiveTab(router.query.tab === "mints" ? 0 : 1);
     }
 
     if (router.query.mintUrl) {
       setMintUrlToShow(router.query.mintUrl as string);
+    }
+
+    if (router.query.mintPubkey) {
+      setMintUrlToShow(router.query.mintPubkey as string);
     }
   }, [router.query]);
 
@@ -115,7 +128,7 @@ const MintTable = () => {
 
     const mintSub = ndk.subscribe(
       {
-        kinds: [Nip87Kinds.CashuInfo],
+        kinds: [Nip87Kinds.CashuInfo, Nip87Kinds.FediInfo],
       } as unknown as NDKFilter,
       { closeOnEose: false }
     );
@@ -128,6 +141,11 @@ const MintTable = () => {
     );
 
     mintSub.on("event", (event: NDKEvent) => {
+      if (event.kind === Nip87Kinds.FediInfo) {
+        dispatch(
+          addMint({event: event.rawEvent(), mintName: "Fedimint"})
+        )
+      }
       dispatch(
         addMintInfosAsync({ event: event.rawEvent(), relay: event.relay!.url })
       );
@@ -155,10 +173,30 @@ const MintTable = () => {
       if (mint.numReviews < filters.mints.minReviews) {
         return false;
       }
+
+      if (
+        !filters.reviews.showCashu &&
+        mint.rawEvent.kind === Nip87Kinds.CashuInfo
+      ) {
+        return false;
+      }
+
+      if (
+        !filters.reviews.showFedimint &&
+        mint.rawEvent.kind === Nip87Kinds.FediInfo
+      ) {
+        return false;
+      }
+
       return true;
     });
     setMintInfos(filteredMintInfos);
-  }, [unfilteredMintInfos, filters.mints]);
+  }, [
+    unfilteredMintInfos,
+    filters.mints,
+    filters.reviews.showFedimint,
+    filters.reviews.showCashu,
+  ]);
 
   useEffect(() => {
     const filteredReviews = unfilteredReviews.filter((review) => {
@@ -166,7 +204,21 @@ const MintTable = () => {
         return false;
       }
 
-      if (mintUrlToShow && mintUrlToShow !== review.mintUrl) {
+      if (mintUrlToShow && (mintUrlToShow !== review.mintUrl && mintUrlToShow !== review.mintPubkey)) {
+        return false;
+      }
+
+      if (
+        !filters.reviews.showCashu &&
+        review.mintType === Nip87MintTypes.Cashu
+      ) {
+        return false;
+      }
+
+      if (
+        !filters.reviews.showFedimint &&
+        review.mintType === Nip87MintTypes.Fedimint
+      ) {
         return false;
       }
 
@@ -180,8 +232,10 @@ const MintTable = () => {
   }, [minReviews, minRating]);
 
   useEffect(() => {
-    dispatch(setReviewsFilter({ friends: onlyFriends }));
-  }, [onlyFriends]);
+    dispatch(
+      setReviewsFilter({ friends: onlyFriends, showCashu, showFedimint })
+    );
+  }, [onlyFriends, showCashu, showFedimint]);
 
   return (
     <div className="w-full">
@@ -193,21 +247,21 @@ const MintTable = () => {
               <Table.Head>
                 <Table.HeadCell>Mint</Table.HeadCell>
                 <Table.HeadCell>
-                  <div  className="flex"> 
-                  <span>Rating</span>&nbsp;
-                  <span
-                    className="hover:cursor-pointer mt-0.5"
-                    onClick={toggleRatingSort}
-                  >
-                    {!ratingSort ? (
-                      <IoIosArrowForward />
+                  <div className="flex">
+                    <span>Rating</span>&nbsp;
+                    <span
+                      className="hover:cursor-pointer mt-0.5"
+                      onClick={toggleRatingSort}
+                    >
+                      {!ratingSort ? (
+                        <IoIosArrowForward />
                       ) : ratingSort === "desc" ? (
                         <IoIosArrowDown />
-                        ) : (
-                          <IoIosArrowUp />
-                          )}
-                  </span>
-                          </div>
+                      ) : (
+                        <IoIosArrowUp />
+                      )}
+                    </span>
+                  </div>
                 </Table.HeadCell>
                 <Table.HeadCell>URL</Table.HeadCell>
                 <Table.HeadCell>Supported Nuts</Table.HeadCell>

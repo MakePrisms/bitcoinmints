@@ -3,6 +3,8 @@ import { createSlice } from "@reduxjs/toolkit";
 interface FilterState {
   reviews: {
     friends: boolean;
+    showCashu: boolean;
+    showFedimint: boolean;
   };
   mints: {
     minRating: number;
@@ -13,6 +15,8 @@ interface FilterState {
 const initialState: FilterState = {
   reviews: {
     friends: false,
+    showCashu: true,
+    showFedimint: false, 
   },
   mints: {
     minRating: 0,

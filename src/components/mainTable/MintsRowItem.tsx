@@ -9,10 +9,11 @@ import { deleteMintInfo } from "@/redux/slices/nip87Slice";
 import ReviewMintButton from "../buttons/ReviewMintButton";
 import { copyToClipboard, shortenString } from "@/utils";
 import { useRouter } from "next/router";
+import FediCodesModal from "../modals/FediCodesModal";
 
 const MintsRowItem = ({ mint }: { mint: Nip87MintInfo }) => {
   const [copied, setCopied] = useState(false);
-  const [show, setShow] = useState(false);
+  const [showFediCodesModal, setShowFediCodesModal] = useState(false);
   const [avgRating, setAvgRating] = useState(0);
 
   const router = useRouter();
@@ -30,11 +31,11 @@ const MintsRowItem = ({ mint }: { mint: Nip87MintInfo }) => {
     dispatch(deleteMintInfo(mintInfoId));
   };
 
-  const handleModalClose = () => {
-    setShow(false);
-  };
-
   const handleCopy = () => {
+    if (!mint.mintUrl) {
+      setShowFediCodesModal(true);
+      return;
+    }
     copyToClipboard(mint.mintUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 3000);
@@ -48,10 +49,16 @@ const MintsRowItem = ({ mint }: { mint: Nip87MintInfo }) => {
   }, [mint.totalRatings, mint.reviewsWithRating])
 
   const handleReviewsClick = () => {
+    let query: any = { ...router.query, tab: "reviews" };
+    if (mint.mintUrl) {
+      query.mintUrl = mint.mintUrl;
+    } else if (mint.mintPubkey) {
+      query.mintPubkey = mint.mintPubkey;
+    }
     router.push(
       {
         pathname: router.pathname,
-        query: { ...router.query, tab: "reviews", mintUrl: mint.mintUrl },
+        query,
       },
       undefined,
       { shallow: true }
@@ -93,7 +100,7 @@ const MintsRowItem = ({ mint }: { mint: Nip87MintInfo }) => {
         {/*  Mint Url */}
         <Table.Cell className="hover:cursor-pointer" onClick={handleCopy}>
           <div className="flex">
-            {shortenString(mint.mintUrl)}
+            {shortenString(mint.mintUrl || "Invite Codes")}
             {copied ? (
               <BsClipboard2CheckFill className="ml-1 mt-1" size={15} />
             ) : (
@@ -101,7 +108,7 @@ const MintsRowItem = ({ mint }: { mint: Nip87MintInfo }) => {
             )}
           </div>
         </Table.Cell>
-        <Table.Cell>{mint.supportedNuts || "not found"}</Table.Cell>
+        <Table.Cell>{mint.supportedNuts || "N/A"}</Table.Cell>
         <Table.Cell>
           {user.pubkey === mint.appPubkey ? (
             <Tooltip content="Attempt to delete">
@@ -115,6 +122,7 @@ const MintsRowItem = ({ mint }: { mint: Nip87MintInfo }) => {
           )}
         </Table.Cell>
       </Table.Row>
+      {mint.inviteCodes && <FediCodesModal inviteCodes={mint.inviteCodes!} show={showFediCodesModal} setShow={setShowFediCodesModal} />}
     </>
   );
 };
