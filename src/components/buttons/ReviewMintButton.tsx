@@ -80,7 +80,7 @@ const ReviewMintButton = ({mint, text}: {mint?: Nip87MintInfo, text: string;}) =
     const reviewEvent = await nip87Reccomendation(ndk, mintToReview, mintType, rating, review);
     
     dispatch(addReview({ event: reviewEvent.rawEvent(), mintNameMap: [{mintUrl, mintName: mintToReview.mintName, inviteCodes}]}))
-    // await reviewEvent.publish();
+    await reviewEvent.publish();
     console.log("Review event", reviewEvent.rawEvent());
     handleModalClose();
   };

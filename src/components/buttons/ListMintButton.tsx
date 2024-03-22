@@ -39,7 +39,7 @@ const ListMintButton = () => {
     });
 
     console.log("mintInfoEvent", mintInfoEvent.rawEvent());
-    // await mintInfoEvent.publish();
+    await mintInfoEvent.publish();
     dispatch(addMint({ event: mintInfoEvent.rawEvent(), mintName: mintUrl || "Fedimint" }));
     handleModalClose();
   };
