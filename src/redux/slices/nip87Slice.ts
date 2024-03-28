@@ -152,7 +152,7 @@ const nip87Slice = createSlice({
           const fedId = action.payload.event.tags.find(
             (t) => t[0] === "d"
           )?.[1];
-          mint.mintPubkey === fedId;
+          return mint.mintPubkey === fedId;
         });
         if (exists) return;
         state.mintInfos = [
