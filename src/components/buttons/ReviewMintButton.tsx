@@ -44,6 +44,9 @@ const ReviewMintButton = ({mint, text}: {mint?: Nip87MintInfo, text: string;}) =
       if (`${review.mintPubkey}${review.userPubkey}` === `${mintPubkey}${user.pubkey}`) {
         return true;
       }
+      if (`${review.mintPubkey}${review.userPubkey}` === `${mint?.mintPubkey}${user.pubkey}`) {
+        return true;
+      }
       return false;
     })
 
