@@ -146,7 +146,7 @@ const MintTable = () => {
 
     mintSub.on("event", (event: NDKEvent) => {
       if (event.kind === Nip87Kinds.FediInfo) {
-        const mintName = `Fedimint ID - ${event.getMatchingTags("d")[0][1].slice(0, 3)}...${event.getMatchingTags("d")[0][1].slice(-3)}`;
+        const mintName = `Fedimint ${event.getMatchingTags("d")[0][1].slice(0, 3)}...${event.getMatchingTags("d")[0][1].slice(-3)}`;
         dispatch(addMint({ event: event.rawEvent(), mintName }));
       }
       dispatch(

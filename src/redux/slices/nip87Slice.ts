@@ -96,7 +96,7 @@ export const addReviewAsync = createAsyncThunk(
           event,
           mintNameMap: [
             {
-              mintName: `Fedimint ID - ${fedId?.slice(0, 3)}...${fedId?.slice(-3)}`,
+              mintName: `Fedimint ${fedId?.slice(0, 3)}...${fedId?.slice(-3)}`,
               inviteCodes,
             },
           ],

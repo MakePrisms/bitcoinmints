@@ -87,7 +87,7 @@ const ReviewMintButton = ({
     } else if (mintPubkey && !mintUrl) {
       // this means the mint is a fedimint mint
       mintType = Nip87MintTypes.Fedimint;
-      const mintName = `Fedimint ID - ${mintPubkey.slice(0, 3)}...${mintPubkey.slice(-3)}`;
+      const mintName = `Fedimint ${mintPubkey.slice(0, 3)}...${mintPubkey.slice(-3)}`;
       mintToReview = {
         inviteCodes: inviteCodes,
         supportedNuts: "undefined",

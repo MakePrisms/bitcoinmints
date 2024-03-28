@@ -43,7 +43,7 @@ const ListMintButton = () => {
     let mintName = mintUrl;
     if (!mintUrl) {
       const fedId = mintInfoEvent.getMatchingTags("d")[0][1];
-      mintName = `Fedimint ID - ${fedId.slice(0, 3)}...${fedId.slice(-3)}`;
+      mintName = `Fedimint ${fedId.slice(0, 3)}...${fedId.slice(-3)}`;
     }
     dispatch(addMint({ event: mintInfoEvent.rawEvent(), mintName }));
     handleModalClose();
