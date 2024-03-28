@@ -60,7 +60,8 @@ const ReviewMintButton = ({mint, text}: {mint?: Nip87MintInfo, text: string;}) =
     } else if (mintPubkey && !mintUrl) {
       // this means the mint is a fedimint mint
       mintType = Nip87MintTypes.Fedimint;
-      mintToReview = {inviteCodes: inviteCodes, supportedNuts: "undefined", mintName: "Fedimint", mintPubkey }
+      const mintName = `Fedimint ID - ${mintPubkey.slice(0,3)}...${mintPubkey.slice(-3)}`;
+      mintToReview = {inviteCodes: inviteCodes, supportedNuts: "undefined", mintName,  mintPubkey }
     } 
     else if (mintData.find((mint) => mint.url === mintUrl)) {
       const {supportedNuts, name: mintName} = mintData.find((mint) => mint.url === mintUrl)!;
