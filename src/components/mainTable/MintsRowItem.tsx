@@ -51,28 +51,9 @@ const MintsRowItem = ({ mint }: { mint: Nip87MintInfo }) => {
   useEffect(() => {
     let totalRatings = 0;
     let reviewsWithRating = 0;
-
-    // for fedimints... quick fix to solve issue of reviews coming in before info events
-    if (mint.inviteCodes || (!mint.totalRatings && !mint.reviewsWithRating)) {
-      // get all reviews for this mint
-      const mintReviews = reviews.filter((review) => {
-        // TODO: this if statement is a quick fix for when mintPUbkey is undefined, but doesn't make sense
-        if (!review.mintPubkey || !mint.mintPubkey) return false;
-        return review.mintPubkey === mint.mintPubkey;
-      });
-
-      mintReviews.forEach((review) => {
-        if (review.rating) {
-          totalRatings += review.rating;
-          reviewsWithRating++;
-        }
-      });
-    } else {
-      // data is already available
-      if (mint.totalRatings) {
-        totalRatings = mint.totalRatings;
-        reviewsWithRating = mint.reviewsWithRating;
-      }
+    if (mint.totalRatings) {
+      totalRatings = mint.totalRatings;
+      reviewsWithRating = mint.reviewsWithRating;
     }
     const avgRating = Number((totalRatings / reviewsWithRating).toFixed(2));
     setReviewData({
@@ -94,7 +75,7 @@ const MintsRowItem = ({ mint }: { mint: Nip87MintInfo }) => {
         query,
       },
       undefined,
-      { shallow: true },
+      { shallow: true }
     );
   };
 

@@ -154,10 +154,10 @@ const nip87Slice = createSlice({
       if (mintUrls.length === 0) return;
 
       if (action.payload.event.kind === Nip87Kinds.FediInfo) {
+        const fedId = action.payload.event.tags.find(
+          (t) => t[0] === "d",
+        )?.[1];
         const exists = state.mintInfos.find((mint) => {
-          const fedId = action.payload.event.tags.find(
-            (t) => t[0] === "d",
-          )?.[1];
           return mint.mintPubkey === fedId;
         });
         if (exists) return;
@@ -169,17 +169,15 @@ const nip87Slice = createSlice({
             rawEvent: action.payload.event,
             relay: action.payload.relay,
             numReviews: state.reviews.filter(
-              (e) => e.mintPubkey === action.payload.event.pubkey,
+              (e) => e.mintPubkey === fedId,
             ).length,
             totalRatings: state.reviews
-              .filter((e) => e.mintPubkey === action.payload.event.pubkey)
+              .filter((e) => e.mintPubkey === fedId)
               .reduce((acc, e) => acc + (e.rating || 0), 0),
             reviewsWithRating: state.reviews
-              .filter((e) => e.mintPubkey === action.payload.event.pubkey)
+              .filter((e) => e.mintPubkey === fedId)
               .filter((e) => e.rating).length,
-            mintPubkey: action.payload.event.tags.find(
-              (t) => t[0] === "d",
-            )?.[1],
+            mintPubkey: fedId,
             inviteCodes: action.payload.event.tags
               .filter((t) => t[0] === "u")
               ?.map((t) => t[1]),
