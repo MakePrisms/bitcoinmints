@@ -55,9 +55,11 @@ const MintsRowItem = ({ mint }: { mint: Nip87MintInfo }) => {
     // for fedimints... quick fix to solve issue of reviews coming in before info events
     if (mint.inviteCodes || (!mint.totalRatings && !mint.reviewsWithRating)) {
       // get all reviews for this mint
-      const mintReviews = reviews.filter(
-        (review) => review.mintPubkey === mint.mintPubkey
-      );
+      const mintReviews = reviews.filter((review) => {
+        // TODO: this if statement is a quick fix for when mintPUbkey is undefined, but doesn't make sense
+        if (!review.mintPubkey || !mint.mintPubkey) return false;
+        return review.mintPubkey === mint.mintPubkey;
+      });
 
       mintReviews.forEach((review) => {
         if (review.rating) {
