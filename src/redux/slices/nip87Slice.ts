@@ -90,10 +90,11 @@ export const addReviewAsync = createAsyncThunk(
       const modules = event.tags
         .find((tag) => tag[0] === "modules")?.[1]
         ?.split(",");
+        const fedId = event.tags.find((tag) => tag[0] === "d")?.[1];
       dispatch(
         addReview({
           event,
-          mintNameMap: [{ mintName: "Fedimint", inviteCodes }],
+          mintNameMap: [{ mintName: `Fedimint ID - ${fedId?.slice(0,3)}...${fedId?.slice(-3)}`, inviteCodes }],
         })
       );
     }

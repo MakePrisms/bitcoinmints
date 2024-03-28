@@ -98,7 +98,7 @@ export const nip87Reccomendation = async (
     }
     const aTag = [
       "a",
-      `${Nip87Kinds.CashuInfo}:cashu-mint-pubkey:${identifier}`,
+      `${infoKind}:${mintType}${mintType === Nip87MintTypes.Cashu ? "-mint" : ""}-pubkey:${identifier}`,
       mint.relay || "",
       "cashu",
     ];

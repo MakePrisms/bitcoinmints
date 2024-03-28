@@ -3,7 +3,7 @@ import { useNdk } from "@/hooks/useNdk";
 import { useState } from "react";
 import { getMintInfo } from "@/utils/cashu";
 import ListReviewModal from "../modals/ListReviewModal";
-import { Nip87MintInfo, Nip87MintTypes, Nip87ReccomendationData } from "@/types";
+import { Nip87Kinds, Nip87MintInfo, Nip87MintTypes, Nip87ReccomendationData } from "@/types";
 import { nip87Reccomendation } from "@/utils/nip87";
 import { useDispatch, useSelector } from "react-redux";
 import { addMintData, addReview } from "@/redux/slices/nip87Slice";
@@ -57,6 +57,9 @@ const ReviewMintButton = ({mint, text}: {mint?: Nip87MintInfo, text: string;}) =
     let mintType:Nip87MintTypes = Nip87MintTypes.Cashu;
     if (mint) {
       mintToReview = mint;
+      if (mint.rawEvent.kind === Nip87Kinds.FediInfo) {
+        mintType = Nip87MintTypes.Fedimint;
+      }
     } else if (mintPubkey && !mintUrl) {
       // this means the mint is a fedimint mint
       mintType = Nip87MintTypes.Fedimint;
@@ -80,7 +83,7 @@ const ReviewMintButton = ({mint, text}: {mint?: Nip87MintInfo, text: string;}) =
 
     const reviewEvent = await nip87Reccomendation(ndk, mintToReview, mintType, rating, review);
     
-    dispatch(addReview({ event: reviewEvent.rawEvent(), mintNameMap: [{mintUrl, mintName: mintToReview.mintName, inviteCodes}]}))
+    dispatch(addReview({ event: reviewEvent.rawEvent(), mintNameMap: [{mintUrl: mintToReview.mintUrl || "", mintName: mintToReview.mintName, inviteCodes: mintToReview.inviteCodes || []}]}))
     await reviewEvent.publish();
     console.log("Review event", reviewEvent.rawEvent());
     handleModalClose();
