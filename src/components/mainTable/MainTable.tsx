@@ -36,7 +36,7 @@ const MintTable = () => {
   const [minRating, setMinRating] = useState(0);
   const [onlyFriends, setOnlyFriends] = useState(false);
   const [showCashu, setShowCashu] = useState(true);
-  const [showFedimint, setShowFedimint] = useState(false);
+  const [showFedimint, setShowFedimint] = useState(true);
   const [showFilters, setShowFilters] = useState(false);
   const [mintUrlToShow, setMintUrlToShow] = useState<string | undefined>();
   const tabsRef = useRef<TabsRef>(null);
