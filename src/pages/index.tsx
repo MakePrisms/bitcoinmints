@@ -11,7 +11,7 @@ const inter = Inter({ subsets: ["latin"] });
 export default function Home() {
   return (
     <>
-     <Head>
+      <Head>
         <title>Bitcoin Mints</title>
       </Head>
       <header>

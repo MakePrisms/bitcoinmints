@@ -30,12 +30,12 @@ const Header = () => {
 
   useEffect(() => {
     const userProfile = JSON.parse(
-      window.localStorage.getItem("profile") || "{}"
+      window.localStorage.getItem("profile") || "{}",
     );
     const { pubkey, image, username } = userProfile;
     if (pubkey) {
       dipsatch(
-        setUser({ pubkey: pubkey, image: image || "", name: username || "" })
+        setUser({ pubkey: pubkey, image: image || "", name: username || "" }),
       );
       setSigner(new NDKNip07Signer());
     }
@@ -50,7 +50,7 @@ const Header = () => {
   const handleLogin = async () => {
     if (!window.nostr) {
       alert(
-        "Nip07 extension not found. Get an extenstion then try again: https://github.com/aljazceru/awesome-nostr?tab=readme-ov-file#nip-07-browser-extensions"
+        "Nip07 extension not found. Get an extenstion then try again: https://github.com/aljazceru/awesome-nostr?tab=readme-ov-file#nip-07-browser-extensions",
       );
       return;
     }
@@ -63,7 +63,7 @@ const Header = () => {
             pubkey,
             image: profile?.image || "",
             name: profile?.name || profile?.displayName || "",
-          })
+          }),
         );
         window.localStorage.setItem(
           "profile",
@@ -71,7 +71,7 @@ const Header = () => {
             pubkey,
             image: profile?.image || "",
             username: profile?.name || profile?.displayName || "",
-          })
+          }),
         );
       } else {
         throw new Error("No pubkey");

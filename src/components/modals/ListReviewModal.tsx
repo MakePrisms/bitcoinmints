@@ -16,7 +16,12 @@ interface FediListingModalBodyProps {
   setInviteCodes?: (codes: string[]) => void;
 }
 
-const FediListingModalBody = ({mintPubkey, setMintPubkey, inviteCodes, setInviteCodes}: FediListingModalBodyProps) => (
+const FediListingModalBody = ({
+  mintPubkey,
+  setMintPubkey,
+  inviteCodes,
+  setInviteCodes,
+}: FediListingModalBodyProps) => (
   <>
     <div>
       <div className="mb-2 block">
@@ -37,12 +42,12 @@ const FediListingModalBody = ({mintPubkey, setMintPubkey, inviteCodes, setInvite
       <Textarea
         placeholder="fedxyz..., fedabc..., fed123..."
         id="invite-codes"
-        value={inviteCodes?.join(',')}
-        onChange={(e) => setInviteCodes!(e.target.value.split(','))}
+        value={inviteCodes?.join(",")}
+        onChange={(e) => setInviteCodes!(e.target.value.split(","))}
       />
     </div>
   </>
-)
+);
 
 interface CashuListingModalBodyProps {
   mintUrl: string;
@@ -102,19 +107,19 @@ const ReviewModalBody = ({
     }
     if (mintPubkey || setMintPubkey) {
       throw new Error(
-        "mintPubkey and setMintPubkey are not allowed on type Cashu"
+        "mintPubkey and setMintPubkey are not allowed on type Cashu",
       );
     }
   }
   if (mintType === Nip87MintTypes.Fedimint) {
     if (mintPubkey === undefined || setMintPubkey === undefined) {
       throw new Error(
-        "mintPubkey and setMintPubkey are required on type Fedimint"
+        "mintPubkey and setMintPubkey are required on type Fedimint",
       );
     }
     if (mintUrl || setMintUrl) {
       throw new Error(
-        "mintUrl and setMintUrl are not allowed on type Fedimint"
+        "mintUrl and setMintUrl are not allowed on type Fedimint",
       );
     }
   }
@@ -128,7 +133,9 @@ const ReviewModalBody = ({
         </div>
         <TextInput
           placeholder={
-            mintType === Nip87MintTypes.Cashu ? "https://mint.example.com" : "ae042fe2b1..."
+            mintType === Nip87MintTypes.Cashu
+              ? "https://mint.example.com"
+              : "ae042fe2b1..."
           }
           id="mint-url"
           value={mintType === Nip87MintTypes.Cashu ? mintUrl : mintPubkey}
@@ -140,21 +147,19 @@ const ReviewModalBody = ({
           required
         />
       </div>
-      {
-        mintType === Nip87MintTypes.Fedimint && (
-          <div>
-            <div className="mb-2 block">
-              <Label>Invite Codes</Label>
-            </div>
-            <Textarea
-              placeholder="fedxyz..., fedabc..., fed123..."
-              id="invite-codes"
-              value={inviteCodes?.join(',')}
-              onChange={(e) => setInviteCodes!(e.target.value.split(','))}
-            />
+      {mintType === Nip87MintTypes.Fedimint && (
+        <div>
+          <div className="mb-2 block">
+            <Label>Invite Codes</Label>
           </div>
-        )
-      }
+          <Textarea
+            placeholder="fedxyz..., fedabc..., fed123..."
+            id="invite-codes"
+            value={inviteCodes?.join(",")}
+            onChange={(e) => setInviteCodes!(e.target.value.split(","))}
+          />
+        </div>
+      )}
       {rating !== undefined && setRating ? (
         <div>
           <Label>Rating</Label>
@@ -253,7 +258,10 @@ const ListReviewModal = ({
               )}
             </div>
           </Tabs.Item>
-          <Tabs.Item title="Fedimint" active={inviteCodes !== undefined && inviteCodes.length > 0}>
+          <Tabs.Item
+            title="Fedimint"
+            active={inviteCodes !== undefined && inviteCodes.length > 0}
+          >
             <div className="space-y-6">
               {type === "review" ? (
                 <ReviewModalBody
@@ -268,7 +276,7 @@ const ListReviewModal = ({
                   setInviteCodes={setInviteCodes}
                 />
               ) : (
-                <FediListingModalBody 
+                <FediListingModalBody
                   mintPubkey={mintPubkey}
                   setMintPubkey={setMintPubkey}
                   inviteCodes={inviteCodes}

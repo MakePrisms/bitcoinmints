@@ -5,7 +5,7 @@ export type GetMintInfoResponse = {
   nuts: V0NutData | V1NutData;
   pubkey: string;
   name: string;
-}
+};
 
 export type MintData = {
   url: string;
@@ -14,4 +14,4 @@ export type MintData = {
   supportedNuts: string;
   name: string;
   pubkey?: string;
-}
+};

@@ -94,7 +94,7 @@ const MintsRowItem = ({ mint }: { mint: Nip87MintInfo }) => {
         query,
       },
       undefined,
-      { shallow: true }
+      { shallow: true },
     );
   };
 

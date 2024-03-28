@@ -45,15 +45,18 @@ const CustomTwitter: React.FC = () => (
 );
 
 const CustomGithub: React.FC = () => (
-  <IconWrapper 
+  <IconWrapper
     IconComponent={BsGithub}
     iconProps={{ className: "text-white" }}
   />
-)
+);
 
 const Footer = () => {
   return (
-    <FlowbiteFooter container className="bg-gradient-to-r from-gray-900 to-gray-800 rounded-none">
+    <FlowbiteFooter
+      container
+      className="bg-gradient-to-r from-gray-900 to-gray-800 rounded-none"
+    >
       <div className="w-full text-center">
         <div className="w-full md:justify-around flex md:flex-row flex-col sm:items-center justify-between ">
           <div>
@@ -83,7 +86,7 @@ const Footer = () => {
               target="__blank"
               icon={CustomTwitter}
             />
-            <FlowbiteFooter.Icon 
+            <FlowbiteFooter.Icon
               href="https://github.com/MakePrisms/bitcoinmints"
               icon={CustomGithub}
               target="__blank"

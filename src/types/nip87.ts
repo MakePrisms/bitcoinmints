@@ -26,9 +26,11 @@ export type Nip87MintInfo = {
   reviewsWithRating: number;
 };
 
-export function isNip87MintInfo(mint: Nip87MintInfo | Nip87ReccomendationData): mint is Nip87MintInfo {
+export function isNip87MintInfo(
+  mint: Nip87MintInfo | Nip87ReccomendationData,
+): mint is Nip87MintInfo {
   return (mint as Nip87MintInfo).appPubkey !== undefined;
-} 
+}
 
 export type Nip87MintReccomendation = {
   mintType: Nip87MintTypes.Cashu | Nip87MintTypes.Fedimint;
@@ -49,4 +51,4 @@ export type Nip87ReccomendationData = {
   mintName: string;
   mintPubkey?: string;
   inviteCodes?: string[];
-}
+};

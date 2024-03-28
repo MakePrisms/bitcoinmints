@@ -29,7 +29,7 @@ export const nip87Info = async (
     kind0Metadata,
     supportedNuts,
     inviteCodes,
-  }: Nip87InfoEventOpts
+  }: Nip87InfoEventOpts,
 ): Promise<NDKEvent> => {
   let tags: NDKTag[] = [];
   if (mintType === Nip87MintTypes.Fedimint) {
@@ -47,7 +47,10 @@ export const nip87Info = async (
   const content = kind0Metadata ? JSON.stringify(kind0Metadata) : "";
 
   const event = new NDKEvent(ndk, {
-    kind: mintType === Nip87MintTypes.Cashu ? Nip87Kinds.CashuInfo : Nip87Kinds.FediInfo,
+    kind:
+      mintType === Nip87MintTypes.Cashu
+        ? Nip87Kinds.CashuInfo
+        : Nip87Kinds.FediInfo,
     content: content,
     tags: tags,
   } as NostrEvent);
@@ -74,7 +77,7 @@ export const nip87Reccomendation = async (
   mint: Nip87MintInfo | Nip87ReccomendationData,
   mintType: Nip87MintTypes,
   rating?: number,
-  review?: string
+  review?: string,
 ): Promise<NDKEvent> => {
   const infoKind =
     mintType === Nip87MintTypes.Cashu

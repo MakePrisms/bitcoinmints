@@ -9,23 +9,23 @@ interface FilterState {
   mints: {
     minRating: number;
     minReviews: number;
-  }
+  };
 }
 
 const initialState: FilterState = {
   reviews: {
     friends: false,
     showCashu: true,
-    showFedimint: false, 
+    showFedimint: false,
   },
   mints: {
     minRating: 0,
     minReviews: 0,
-  }
+  },
 };
 
 export const filterSlice = createSlice({
-  name: 'filters',
+  name: "filters",
   initialState,
   reducers: {
     setMintsFilter: (state, action) => {
@@ -33,7 +33,7 @@ export const filterSlice = createSlice({
     },
     setReviewsFilter: (state, action) => {
       state.reviews = action.payload;
-    }
+    },
   },
 });
 

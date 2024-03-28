@@ -120,7 +120,11 @@ const ReviewsRowItem = ({ review }: { review: Nip87MintReccomendation }) => {
           )}
         </Table.Cell>
       </Table.Row>
-      <FediCodesModal inviteCodes={review.inviteCodes!} show={showFediCodesModal} setShow={setShowFediCodesModal}/>
+      <FediCodesModal
+        inviteCodes={review.inviteCodes!}
+        show={showFediCodesModal}
+        setShow={setShowFediCodesModal}
+      />
     </>
   );
 };
