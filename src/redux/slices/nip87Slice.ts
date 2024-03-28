@@ -148,9 +148,12 @@ const nip87Slice = createSlice({
       if (mintUrls.length === 0) return;
 
       if (action.payload.event.kind === Nip87Kinds.FediInfo) {
-        const exists = state.mintInfos.find(
-          (mint) => `${mint.mintPubkey}` === `${action.payload.event.pubkey}`
-        )
+        const exists = state.mintInfos.find((mint) => {
+          const fedId = action.payload.event.tags.find(
+            (t) => t[0] === "d"
+          )?.[1];
+          mint.mintPubkey === fedId;
+        });
         if (exists) return;
         state.mintInfos = [
           ...state.mintInfos,
