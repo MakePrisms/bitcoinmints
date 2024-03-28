@@ -25,7 +25,7 @@ const FediListingModalBody = ({
   <>
     <div>
       <div className="mb-2 block">
-        <Label>Mint Pubkey</Label>
+        <Label>Federation ID</Label>
       </div>
       <TextInput
         placeholder="ae042fe2b1..."
@@ -128,7 +128,7 @@ const ReviewModalBody = ({
       <div>
         <div className="mb-2 block">
           <Label>
-            {mintType === Nip87MintTypes.Cashu ? "Mint URL" : "Mint Pubkey"}
+            {mintType === Nip87MintTypes.Cashu ? "Mint URL" : "Federation ID"}
           </Label>
         </div>
         <TextInput
