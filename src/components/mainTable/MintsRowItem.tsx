@@ -102,7 +102,7 @@ const MintsRowItem = ({ mint }: { mint: Nip87MintInfo }) => {
     <>
       <Table.Row className="dark:bg-gray-800">
         {/* Mint name */}
-        <Table.Cell>{mint.mintName}</Table.Cell>
+        <Table.Cell className="min-w-36">{mint.mintName}</Table.Cell>
 
         {/* Average Rating */}
         <Table.Cell>
