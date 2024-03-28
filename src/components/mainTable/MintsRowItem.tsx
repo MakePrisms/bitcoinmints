@@ -14,11 +14,18 @@ import FediCodesModal from "../modals/FediCodesModal";
 const MintsRowItem = ({ mint }: { mint: Nip87MintInfo }) => {
   const [copied, setCopied] = useState(false);
   const [showFediCodesModal, setShowFediCodesModal] = useState(false);
-  const [avgRating, setAvgRating] = useState(0);
+  const [reviewData, setReviewData] = useState<{
+    avgRating: number;
+    numReviewsWithRating: number;
+  }>({
+    avgRating: 0,
+    numReviewsWithRating: 0,
+  });
 
   const router = useRouter();
 
   const user = useSelector((state: RootState) => state.user);
+  const reviews = useSelector((state: RootState) => state.nip87.reviews);
 
   const { ndk, attemptDeleteEvent } = useNdk();
 
@@ -42,11 +49,36 @@ const MintsRowItem = ({ mint }: { mint: Nip87MintInfo }) => {
   };
 
   useEffect(() => {
-    if (mint.totalRatings) {
-      const avgRating = mint.totalRatings / mint.reviewsWithRating;
-      setAvgRating(Number(avgRating.toFixed(2)));
+    let totalRatings = 0;
+    let reviewsWithRating = 0;
+
+    // for fedimints... quick fix to solve issue of reviews coming in before info events
+    if (!mint.totalRatings || !mint.reviewsWithRating) {
+      
+      // get all reviews for this mint
+      const mintReviews = reviews.filter(
+        (review) => review.mintPubkey === mint.mintPubkey
+      );
+
+      mintReviews.forEach((review) => {
+        if (review.rating) {
+          totalRatings += review.rating;
+          reviewsWithRating++;
+        }
+      });
+    } else {
+      // data is already available
+      if (mint.totalRatings) {
+        totalRatings = mint.totalRatings;
+        reviewsWithRating = mint.reviewsWithRating;
+      }
     }
-  }, [mint.totalRatings, mint.reviewsWithRating])
+    const avgRating = Number((totalRatings / reviewsWithRating).toFixed(2));
+    setReviewData({
+      avgRating: avgRating,
+      numReviewsWithRating: reviewsWithRating,
+    });
+  }, [reviews, mint]);
 
   const handleReviewsClick = () => {
     let query: any = { ...router.query, tab: "reviews" };
@@ -74,21 +106,20 @@ const MintsRowItem = ({ mint }: { mint: Nip87MintInfo }) => {
         {/* Average Rating */}
         <Table.Cell>
           <div className="flex flex-col md:flex-row">
-            {mint.totalRatings ? (
+            {reviewData.avgRating ? (
               <>
                 <Rating>
                   <Rating.Star />
                   &nbsp;
-                  {avgRating || "No reviews"}
-                &nbsp;&middot;&nbsp;
+                  {reviewData.avgRating || "No reviews"}
+                  &nbsp;&middot;&nbsp;
                 </Rating>
                 <div
                   className="hover:cursor-pointer underline w-fit whitespace-nowrap"
                   onClick={handleReviewsClick}
-                  
                 >
-                  {mint.reviewsWithRating} review
-                  {mint.reviewsWithRating > 1 ? "s" : ""}
+                  {reviewData.numReviewsWithRating} review
+                  {reviewData.numReviewsWithRating > 1 ? "s" : ""}
                 </div>
               </>
             ) : (
@@ -122,7 +153,13 @@ const MintsRowItem = ({ mint }: { mint: Nip87MintInfo }) => {
           )}
         </Table.Cell>
       </Table.Row>
-      {mint.inviteCodes && <FediCodesModal inviteCodes={mint.inviteCodes!} show={showFediCodesModal} setShow={setShowFediCodesModal} />}
+      {mint.inviteCodes && (
+        <FediCodesModal
+          inviteCodes={mint.inviteCodes!}
+          show={showFediCodesModal}
+          setShow={setShowFediCodesModal}
+        />
+      )}
     </>
   );
 };
