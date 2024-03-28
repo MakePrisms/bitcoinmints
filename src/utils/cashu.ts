@@ -11,7 +11,7 @@ const timeout = (ms: number) => {
 const fetchWithTimeout = async (
   url: string,
   options: RequestInit,
-  timeoutMs: number
+  timeoutMs: number,
 ) => {
   return Promise.race([
     fetch(url, options),
@@ -31,10 +31,14 @@ export const getMintInfo = async (mintUrl: string): Promise<MintData> => {
   let nutSet = new Set<number>();
   const fetchAndProcessData = async (
     endpoint: string,
-    version: "v0" | "v1"
+    version: "v0" | "v1",
   ) => {
     try {
-      const res = await fetchWithTimeout(`/api/mintinfo?mintUrl=${encodeURIComponent(`${mintUrl}/${endpoint}`)}`, {}, 10_000);
+      const res = await fetchWithTimeout(
+        `/api/mintinfo?mintUrl=${encodeURIComponent(`${mintUrl}/${endpoint}`)}`,
+        {},
+        10_000,
+      );
       const mintInfo = (await res.json()) as GetMintInfoResponse;
 
       if (res.status !== 200) {

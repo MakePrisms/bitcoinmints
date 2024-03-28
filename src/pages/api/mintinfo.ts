@@ -4,7 +4,7 @@ import type { NextApiRequest, NextApiResponse } from "next";
 
 export default function handler(
   req: NextApiRequest,
-  res: NextApiResponse<GetMintInfoResponse | {error: string;}>,
+  res: NextApiResponse<GetMintInfoResponse | { error: string }>,
 ) {
   // get the query parameter call url
   const { mintUrl } = req.query;

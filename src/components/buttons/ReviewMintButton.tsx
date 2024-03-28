@@ -3,17 +3,30 @@ import { useNdk } from "@/hooks/useNdk";
 import { useState } from "react";
 import { getMintInfo } from "@/utils/cashu";
 import ListReviewModal from "../modals/ListReviewModal";
-import { Nip87MintInfo, Nip87MintTypes, Nip87ReccomendationData } from "@/types";
+import {
+  Nip87Kinds,
+  Nip87MintInfo,
+  Nip87MintTypes,
+  Nip87ReccomendationData,
+} from "@/types";
 import { nip87Reccomendation } from "@/utils/nip87";
 import { useDispatch, useSelector } from "react-redux";
 import { addMintData, addReview } from "@/redux/slices/nip87Slice";
 import { RootState } from "@/redux/store";
 
-const ReviewMintButton = ({mint, text}: {mint?: Nip87MintInfo, text: string;}) => {
+const ReviewMintButton = ({
+  mint,
+  text,
+}: {
+  mint?: Nip87MintInfo;
+  text: string;
+}) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [mintUrl, setMintUrl] = useState(mint?.mintUrl || "");
   const [mintPubkey, setMintPubkey] = useState(mint?.mintPubkey || "");
-  const [inviteCodes, setInviteCodes] = useState<string[]>(mint?.inviteCodes || []);
+  const [inviteCodes, setInviteCodes] = useState<string[]>(
+    mint?.inviteCodes || [],
+  );
   const [rating, setRating] = useState(0);
   const [review, setReview] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
@@ -38,48 +51,88 @@ const ReviewMintButton = ({mint, text}: {mint?: Nip87MintInfo, text: string;}) =
 
   const handleModalSubmit = async () => {
     const exists = reviews.find((review) => {
-      if(`${review.mintUrl}${review.userPubkey}` === `${mintUrl}${user.pubkey}`) {
+      if (
+        `${review.mintUrl}${review.userPubkey}` === `${mintUrl}${user.pubkey}`
+      ) {
         return true;
-      };
-      if (`${review.mintPubkey}${review.userPubkey}` === `${mintPubkey}${user.pubkey}`) {
+      }
+      if (
+        `${review.mintPubkey}${review.userPubkey}` ===
+        `${mintPubkey}${user.pubkey}`
+      ) {
+        return true;
+      }
+      if (
+        `${review.mintPubkey}${review.userPubkey}` ===
+        `${mint?.mintPubkey}${user.pubkey}`
+      ) {
         return true;
       }
       return false;
-    })
+    });
 
     if (exists) {
       alert("You already reviewed this mint");
       return;
     }
-    
+
     setIsProcessing(true);
     let mintToReview: Nip87MintInfo | Nip87ReccomendationData;
-    let mintType:Nip87MintTypes = Nip87MintTypes.Cashu;
+    let mintType: Nip87MintTypes = Nip87MintTypes.Cashu;
     if (mint) {
       mintToReview = mint;
+      if (mint.rawEvent.kind === Nip87Kinds.FediInfo) {
+        mintType = Nip87MintTypes.Fedimint;
+      }
     } else if (mintPubkey && !mintUrl) {
       // this means the mint is a fedimint mint
       mintType = Nip87MintTypes.Fedimint;
-      mintToReview = {inviteCodes: inviteCodes, supportedNuts: "undefined", mintName: "Fedimint", mintPubkey }
-    } 
-    else if (mintData.find((mint) => mint.url === mintUrl)) {
-      const {supportedNuts, name: mintName} = mintData.find((mint) => mint.url === mintUrl)!;
-      mintToReview = {mintUrl, supportedNuts, mintName};
+      const mintName = `Fedimint ${mintPubkey.slice(0, 3)}...${mintPubkey.slice(-3)}`;
+      mintToReview = {
+        inviteCodes: inviteCodes,
+        supportedNuts: "undefined",
+        mintName,
+        mintPubkey,
+      };
+    } else if (mintData.find((mint) => mint.url === mintUrl)) {
+      const { supportedNuts, name: mintName } = mintData.find(
+        (mint) => mint.url === mintUrl,
+      )!;
+      mintToReview = { mintUrl, supportedNuts, mintName };
     } else {
-      const mintData = await getMintInfo(mintUrl).then((res) => res).catch(() => {
-        setIsProcessing(false);
-        alert("Error: Could not find mint");
-        throw new Error("Could not find mint");
-      });
+      const mintData = await getMintInfo(mintUrl)
+        .then((res) => res)
+        .catch(() => {
+          setIsProcessing(false);
+          alert("Error: Could not find mint");
+          throw new Error("Could not find mint");
+        });
       dispatch(addMintData(mintData));
-      const {supportedNuts, name: mintName} = mintData;
+      const { supportedNuts, name: mintName } = mintData;
 
       mintToReview = { mintUrl, supportedNuts, mintName };
     }
 
-    const reviewEvent = await nip87Reccomendation(ndk, mintToReview, mintType, rating, review);
-    
-    dispatch(addReview({ event: reviewEvent.rawEvent(), mintNameMap: [{mintUrl, mintName: mintToReview.mintName, inviteCodes}]}))
+    const reviewEvent = await nip87Reccomendation(
+      ndk,
+      mintToReview,
+      mintType,
+      rating,
+      review,
+    );
+
+    dispatch(
+      addReview({
+        event: reviewEvent.rawEvent(),
+        mintNameMap: [
+          {
+            mintUrl: mintToReview.mintUrl || "",
+            mintName: mintToReview.mintName,
+            inviteCodes: mintToReview.inviteCodes || [],
+          },
+        ],
+      }),
+    );
     await reviewEvent.publish();
     console.log("Review event", reviewEvent.rawEvent());
     handleModalClose();
@@ -87,13 +140,13 @@ const ReviewMintButton = ({mint, text}: {mint?: Nip87MintInfo, text: string;}) =
 
   return (
     <div>
-      {
-        user.pubkey ? (
-          <Button onClick={() => setIsModalOpen(true)}>{text}</Button>
-        ) : (
-          <Button onClick={() => alert("You must be logged in to review a mint")}>{text}</Button>
-        )
-      }
+      {user.pubkey ? (
+        <Button onClick={() => setIsModalOpen(true)}>{text}</Button>
+      ) : (
+        <Button onClick={() => alert("You must be logged in to review a mint")}>
+          {text}
+        </Button>
+      )}
       <ListReviewModal
         show={isModalOpen}
         onClose={handleModalClose}

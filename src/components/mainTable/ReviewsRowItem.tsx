@@ -82,10 +82,13 @@ const ReviewsRowItem = ({ review }: { review: Nip87MintReccomendation }) => {
   return (
     <>
       <Table.Row className="dark:bg-gray-800">
+        {/* Reviewed By */}
         <Table.Cell>
           <NostrProfile pubkey={review.userPubkey} />
         </Table.Cell>
-        <Table.Cell className="hover:cursor-pointer " onClick={handleCopy}>
+
+        {/* Mint Name */}
+        <Table.Cell className="hover:cursor-pointer min-w-40 " onClick={handleCopy}>
           <div className="flex">
             {review.mintName}
             {copied ? (
@@ -95,6 +98,8 @@ const ReviewsRowItem = ({ review }: { review: Nip87MintReccomendation }) => {
             )}
           </div>
         </Table.Cell>
+
+        {/* Rating */}
         <Table.Cell>
           {review.rating ? (
             <Rating>
@@ -106,9 +111,13 @@ const ReviewsRowItem = ({ review }: { review: Nip87MintReccomendation }) => {
             "N/A"
           )}
         </Table.Cell>
+
+        {/* Review */}
         <Table.Cell className="min-w-60">
           <ReviewCell review={review.review} />
         </Table.Cell>
+
+        {/* Delete button */}
         <Table.Cell>
           {user.pubkey === review.userPubkey && (
             <Tooltip content="Attempt to delete">
@@ -120,7 +129,11 @@ const ReviewsRowItem = ({ review }: { review: Nip87MintReccomendation }) => {
           )}
         </Table.Cell>
       </Table.Row>
-      <FediCodesModal inviteCodes={review.inviteCodes!} show={showFediCodesModal} setShow={setShowFediCodesModal}/>
+      <FediCodesModal
+        inviteCodes={review.inviteCodes!}
+        show={showFediCodesModal}
+        setShow={setShowFediCodesModal}
+      />
     </>
   );
 };

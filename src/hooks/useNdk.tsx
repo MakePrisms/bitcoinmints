@@ -1,5 +1,11 @@
 import { useContext, createContext, useState, useEffect, useRef } from "react";
-import NDK, { NDKEvent, NDKKind, NDKSigner, NDKUserProfile, NostrEvent } from "@nostr-dev-kit/ndk";
+import NDK, {
+  NDKEvent,
+  NDKKind,
+  NDKSigner,
+  NDKUserProfile,
+  NostrEvent,
+} from "@nostr-dev-kit/ndk";
 
 interface NDKContextProps {
   ndk: NDK;
@@ -15,10 +21,10 @@ const NDKContext = createContext<NDKContextProps>({
   setSigner: (signer: NDKSigner) => {},
   removeSigner: () => {},
   fetchUserProfile: async (pubkey: string): Promise<NDKUserProfile> =>
-    ({} as NDKUserProfile),
+    ({}) as NDKUserProfile,
   fetchFollowingPubkeys: async (pubkey: string): Promise<string[]> => [],
   attemptDeleteEvent: async (event: NostrEvent): Promise<NDKEvent> =>
-    ({} as NDKEvent),
+    ({}) as NDKEvent,
 });
 
 const defaultRelays = [
@@ -28,7 +34,7 @@ const defaultRelays = [
   "wss://relay.primal.net",
   "wss://bitcoiner.social",
   "wss://relay.satoshidnc.com",
-  "wss://nos.lol"
+  "wss://nos.lol",
 ];
 
 export const NDKProvider = ({ children }: any) => {
@@ -52,7 +58,7 @@ export const NDKProvider = ({ children }: any) => {
 
   const removeSigner = () => {
     ndk.current.signer = undefined;
-  }
+  };
 
   const fetchUserProfile = async (pubkey: string) => {
     const user = ndk.current.getUser({ pubkey });
@@ -62,14 +68,14 @@ export const NDKProvider = ({ children }: any) => {
 
   const fetchFollowingPubkeys = async (pubkey: string) => {
     const user = ndk.current.getUser({ pubkey });
-    const following = await user.follows({ closeOnEose: false})
+    const following = await user.follows({ closeOnEose: false });
     return Array.from(following).map((user) => user.pubkey);
-  }
+  };
 
   const attemptDeleteEvent = async (event: NostrEvent) => {
-    const eventToDelete = new NDKEvent(ndk.current, event)
+    const eventToDelete = new NDKEvent(ndk.current, event);
     const deleted = await eventToDelete.delete("Deleted by user", true);
-    console.log(deleted.rawEvent())
+    console.log(deleted.rawEvent());
     return deleted;
   };
 

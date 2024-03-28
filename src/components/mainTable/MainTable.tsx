@@ -10,7 +10,11 @@ import {
   Nip87MintTypes,
 } from "@/types";
 import { RootState, useAppDispatch } from "@/redux/store";
-import { addMint, addMintInfosAsync, addReviewAsync } from "@/redux/slices/nip87Slice";
+import {
+  addMint,
+  addMintInfosAsync,
+  addReviewAsync,
+} from "@/redux/slices/nip87Slice";
 import MintsRowItem from "./MintsRowItem";
 import TableRowEndorsement from "./ReviewsRowItem";
 import Filters from "./Filters";
@@ -32,12 +36,12 @@ const MintTable = () => {
   const [minRating, setMinRating] = useState(0);
   const [onlyFriends, setOnlyFriends] = useState(false);
   const [showCashu, setShowCashu] = useState(true);
-  const [showFedimint, setShowFedimint] = useState(false);
+  const [showFedimint, setShowFedimint] = useState(true);
   const [showFilters, setShowFilters] = useState(false);
   const [mintUrlToShow, setMintUrlToShow] = useState<string | undefined>();
   const tabsRef = useRef<TabsRef>(null);
   const [ratingSort, setRatingSort] = useState<"asc" | "desc" | undefined>(
-    "desc"
+    "desc",
   );
 
   const router = useRouter();
@@ -89,7 +93,7 @@ const MintTable = () => {
         query: newQuery,
       },
       undefined,
-      { shallow: true }
+      { shallow: true },
     );
 
     setMintsPage(1);
@@ -100,7 +104,7 @@ const MintTable = () => {
     const states = ["desc", "asc", undefined];
     const currentIndex = states.indexOf(ratingSort);
     setRatingSort(
-      states[(currentIndex + 1) % states.length] as "asc" | "desc" | undefined
+      states[(currentIndex + 1) % states.length] as "asc" | "desc" | undefined,
     );
   };
 
@@ -130,24 +134,23 @@ const MintTable = () => {
       {
         kinds: [Nip87Kinds.CashuInfo, Nip87Kinds.FediInfo],
       } as unknown as NDKFilter,
-      { closeOnEose: false }
+      { closeOnEose: false },
     );
 
     const reviewSub = ndk.subscribe(
       {
         kinds: [Nip87Kinds.Reccomendation],
       } as unknown as NDKFilter,
-      { closeOnEose: false }
+      { closeOnEose: false },
     );
 
     mintSub.on("event", (event: NDKEvent) => {
       if (event.kind === Nip87Kinds.FediInfo) {
-        dispatch(
-          addMint({event: event.rawEvent(), mintName: "Fedimint"})
-        )
+        const mintName = `Fedimint ${event.getMatchingTags("d")[0][1].slice(0, 3)}...${event.getMatchingTags("d")[0][1].slice(-3)}`;
+        dispatch(addMint({ event: event.rawEvent(), mintName }));
       }
       dispatch(
-        addMintInfosAsync({ event: event.rawEvent(), relay: event.relay!.url })
+        addMintInfosAsync({ event: event.rawEvent(), relay: event.relay!.url }),
       );
     });
 
@@ -156,7 +159,7 @@ const MintTable = () => {
         addReviewAsync({
           event: event.rawEvent(),
           infoEventRelay: undefined,
-        })
+        }),
       );
     });
   }, [ndk, dispatch]);
@@ -204,7 +207,11 @@ const MintTable = () => {
         return false;
       }
 
-      if (mintUrlToShow && (mintUrlToShow !== review.mintUrl && mintUrlToShow !== review.mintPubkey)) {
+      if (
+        mintUrlToShow &&
+        mintUrlToShow !== review.mintUrl &&
+        mintUrlToShow !== review.mintPubkey
+      ) {
         return false;
       }
 
@@ -233,7 +240,7 @@ const MintTable = () => {
 
   useEffect(() => {
     dispatch(
-      setReviewsFilter({ friends: onlyFriends, showCashu, showFedimint })
+      setReviewsFilter({ friends: onlyFriends, showCashu, showFedimint }),
     );
   }, [onlyFriends, showCashu, showFedimint]);
 
@@ -273,7 +280,7 @@ const MintTable = () => {
                 {mintInfos
                   .slice(
                     mintsPage * maxPerPage - maxPerPage,
-                    mintsPage * maxPerPage
+                    mintsPage * maxPerPage,
                   )
                   .sort((a, b) => {
                     const aRating =
@@ -325,7 +332,7 @@ const MintTable = () => {
                 {reviews
                   .slice(
                     reviewsPage * maxPerPage - maxPerPage,
-                    reviewsPage * maxPerPage
+                    reviewsPage * maxPerPage,
                   )
                   .map((review, idx) => (
                     <TableRowEndorsement review={review} key={idx} />

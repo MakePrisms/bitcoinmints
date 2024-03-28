@@ -32,13 +32,13 @@ const MintFilters = ({
   setShowFedimint,
   setShowFilters,
 }: FiltersProps) => {
-  const loggedIn = useSelector((state: RootState) => state.user.pubkey !== "")
+  const loggedIn = useSelector((state: RootState) => state.user.pubkey !== "");
 
   useEffect(() => {
     if (!loggedIn) {
-      setOnlyFriends(false)
+      setOnlyFriends(false);
     }
-  }, [loggedIn])
+  }, [loggedIn]);
 
   return (
     <>

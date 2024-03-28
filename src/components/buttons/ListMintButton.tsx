@@ -40,7 +40,12 @@ const ListMintButton = () => {
 
     console.log("mintInfoEvent", mintInfoEvent.rawEvent());
     await mintInfoEvent.publish();
-    dispatch(addMint({ event: mintInfoEvent.rawEvent(), mintName: mintUrl || "Fedimint" }));
+    let mintName = mintUrl;
+    if (!mintUrl) {
+      const fedId = mintInfoEvent.getMatchingTags("d")[0][1];
+      mintName = `Fedimint ${fedId.slice(0, 3)}...${fedId.slice(-3)}`;
+    }
+    dispatch(addMint({ event: mintInfoEvent.rawEvent(), mintName }));
     handleModalClose();
   };
 
@@ -81,7 +86,7 @@ const ListMintButton = () => {
 
       if (!pubkey)
         alert(
-          "Your mint does not return a pubkey from the /info endpoint. You should add one and try again, but you can continue without it."
+          "Your mint does not return a pubkey from the /info endpoint. You should add one and try again, but you can continue without it.",
         );
 
       const mintInfoEvent = await nip87Info(ndk, Nip87MintTypes.Cashu, {

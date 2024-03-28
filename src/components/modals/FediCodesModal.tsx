@@ -8,27 +8,30 @@ type FediCodesModalProps = {
   inviteCodes: string[];
 };
 
-const FediCodesModal = ({ show, setShow, inviteCodes}: FediCodesModalProps) => {
+const FediCodesModal = ({
+  show,
+  setShow,
+  inviteCodes,
+}: FediCodesModalProps) => {
   if (inviteCodes === undefined || inviteCodes.length === 0) return null;
-  return (<Modal
-        show={show}
-        onClose={() => setShow(false)}
-      >
-        <Modal.Header>Invite Codes</Modal.Header>
-        <Modal.Body>
-          <List>
-            {inviteCodes.map((code, i) => (
-              <List.Item key={i} className="flex">
-                {shortenString(code)}
-                <BsClipboard2
-                  className="hover:cursor-pointer ml-1 mt-1"
-                  onClick={() => copyToClipboard(code)}
-                />
-              </List.Item>
-            ))}
-          </List>
-        </Modal.Body>
-      </Modal>)
-}
+  return (
+    <Modal show={show} onClose={() => setShow(false)}>
+      <Modal.Header>Invite Codes</Modal.Header>
+      <Modal.Body>
+        <List>
+          {inviteCodes.map((code, i) => (
+            <List.Item key={i} className="flex">
+              {shortenString(code)}
+              <BsClipboard2
+                className="hover:cursor-pointer ml-1 mt-1"
+                onClick={() => copyToClipboard(code)}
+              />
+            </List.Item>
+          ))}
+        </List>
+      </Modal.Body>
+    </Modal>
+  );
+};
 
 export default FediCodesModal;

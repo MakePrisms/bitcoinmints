@@ -38,7 +38,7 @@ const getMintInfoWithCache = async (url: string) => {
           fetchMintInfoCache.delete(url);
           console.error("Error fetching mint url", e);
           throw e;
-        })
+        }),
     );
   }
 
@@ -49,7 +49,7 @@ export const addMintInfosAsync = createAsyncThunk(
   "nip87/addMint",
   async (
     { event, relay }: { event: NostrEvent; relay?: string },
-    { getState, dispatch }
+    { getState, dispatch },
   ) => {
     const mintUrls = event.tags
       .filter((tag) => tag[0] === "u")
@@ -60,7 +60,7 @@ export const addMintInfosAsync = createAsyncThunk(
 
     const state = getState() as RootState;
     const fetchedMint = state.nip87.mints.find(
-      (mint) => mint.url === mintUrls[0]
+      (mint) => mint.url === mintUrls[0],
     );
 
     let mintName = "";
@@ -74,14 +74,14 @@ export const addMintInfosAsync = createAsyncThunk(
     }
 
     dispatch(addMint({ event, relay, mintName }));
-  }
+  },
 );
 
 export const addReviewAsync = createAsyncThunk(
   "nip87/addReview",
   async (
     { event, infoEventRelay }: { event: NostrEvent; infoEventRelay?: string },
-    { getState, dispatch }
+    { getState, dispatch },
   ) => {
     if (event.tags.find((tag) => tag[0] === "k" && tag[1] === "38173")) {
       const inviteCodes = event.tags
@@ -90,11 +90,17 @@ export const addReviewAsync = createAsyncThunk(
       const modules = event.tags
         .find((tag) => tag[0] === "modules")?.[1]
         ?.split(",");
+      const fedId = event.tags.find((tag) => tag[0] === "d")?.[1];
       dispatch(
         addReview({
           event,
-          mintNameMap: [{ mintName: "Fedimint", inviteCodes }],
-        })
+          mintNameMap: [
+            {
+              mintName: `Fedimint ${fedId?.slice(0, 3)}...${fedId?.slice(-3)}`,
+              inviteCodes,
+            },
+          ],
+        }),
       );
     }
 
@@ -104,7 +110,7 @@ export const addReviewAsync = createAsyncThunk(
 
     const state = getState() as RootState;
     const fetchedMints = state.nip87.mints.filter((mint) =>
-      mintUrls.includes(mint.url)
+      mintUrls.includes(mint.url),
     );
 
     const mintNameMap = [];
@@ -124,7 +130,7 @@ export const addReviewAsync = createAsyncThunk(
     }
 
     dispatch(addReview({ event, infoEventRelay, mintNameMap }));
-  }
+  },
 );
 
 const nip87Slice = createSlice({
@@ -139,7 +145,7 @@ const nip87Slice = createSlice({
       state,
       action: {
         payload: { event: NostrEvent; relay?: string; mintName: string };
-      }
+      },
     ) {
       const mintUrls = action.payload.event.tags
         .filter((tag) => tag[0] === "u")
@@ -148,9 +154,12 @@ const nip87Slice = createSlice({
       if (mintUrls.length === 0) return;
 
       if (action.payload.event.kind === Nip87Kinds.FediInfo) {
-        const exists = state.mintInfos.find(
-          (mint) => `${mint.mintPubkey}` === `${action.payload.event.pubkey}`
-        )
+        const fedId = action.payload.event.tags.find(
+          (t) => t[0] === "d",
+        )?.[1];
+        const exists = state.mintInfos.find((mint) => {
+          return mint.mintPubkey === fedId;
+        });
         if (exists) return;
         state.mintInfos = [
           ...state.mintInfos,
@@ -159,23 +168,27 @@ const nip87Slice = createSlice({
             appPubkey: action.payload.event.pubkey,
             rawEvent: action.payload.event,
             relay: action.payload.relay,
-            numReviews: state.reviews.filter((e) => e.mintPubkey === action.payload.event.pubkey).length,
+            numReviews: state.reviews.filter(
+              (e) => e.mintPubkey === fedId,
+            ).length,
             totalRatings: state.reviews
-              .filter((e) => e.mintPubkey === action.payload.event.pubkey)
+              .filter((e) => e.mintPubkey === fedId)
               .reduce((acc, e) => acc + (e.rating || 0), 0),
             reviewsWithRating: state.reviews
-              .filter((e) => e.mintPubkey === action.payload.event.pubkey)
+              .filter((e) => e.mintPubkey === fedId)
               .filter((e) => e.rating).length,
-            mintPubkey: action.payload.event.tags.find((t) => t[0] === "d")?.[1],
-            inviteCodes: action.payload.event.tags.filter((t) => t[0] === "u")?.map((t) => t[1]),
+            mintPubkey: fedId,
+            inviteCodes: action.payload.event.tags
+              .filter((t) => t[0] === "u")
+              ?.map((t) => t[1]),
           },
-        ]
+        ];
         return;
       }
 
       mintUrls.forEach((mintUrl) => {
         const exists = state.mintInfos.find(
-          (mint) => `${mint.mintUrl}` === `${mintUrl}`
+          (mint) => `${mint.mintUrl}` === `${mintUrl}`,
         );
 
         if (!exists) {
@@ -187,7 +200,7 @@ const nip87Slice = createSlice({
               appPubkey: action.payload.event.pubkey,
               rawEvent: action.payload.event,
               supportedNuts: action.payload.event.tags.find(
-                (t) => t[0] === "nuts"
+                (t) => t[0] === "nuts",
               )?.[1],
               relay: action.payload.relay,
               numReviews: state.reviews.filter((e) => e.mintUrl === mintUrl)
@@ -215,25 +228,29 @@ const nip87Slice = createSlice({
           }[];
           infoEventRelay?: string;
         };
-      }
+      },
     ) {
       if (action.payload.event.kind !== Nip87Kinds.Reccomendation) return;
 
+      // extract data rating/review from event content - `[{rating}/5] {review}`
       const rating = action.payload.event.content.match(/\[(\d)\/5\]/)?.[1];
       const review = action.payload.event.content.replace(/\[(\d)\/5\]/, "");
 
       if (action.payload.mintNameMap[0].mintUrl) {
         const mintUrl = action.payload.mintNameMap[0].mintUrl;
+
+        // check if review already added to state
         const exists = state.reviews.find(
           (r) =>
             `${r.mintUrl}${r.userPubkey}` ===
-            `${mintUrl}${action.payload.event.pubkey}`
+            `${mintUrl}${action.payload.event.pubkey}`,
         );
 
         const mintName = action.payload.mintNameMap.find(
-          (m) => m.mintUrl === mintUrl
+          (m) => m.mintUrl === mintUrl,
         )?.mintName!;
 
+        // if review does not exist, add it to state
         if (!exists) {
           state.reviews = [
             ...state.reviews,
@@ -248,6 +265,7 @@ const nip87Slice = createSlice({
               mintInfoEventRelay: action.payload.infoEventRelay,
             },
           ];
+
           // update the mint info with new review data
           const mintInfo = state.mintInfos.find((m) => m.mintUrl === mintUrl);
           if (mintInfo) {
@@ -258,17 +276,23 @@ const nip87Slice = createSlice({
               mintInfo.reviewsWithRating + (rating ? 1 : 0);
             // update the mint info in the state
             state.mintInfos = state.mintInfos.map((m) =>
-              m.mintUrl === mintUrl ? mintInfo : m
+              m.mintUrl === mintUrl ? mintInfo : m,
             );
           }
         }
       } else if (action.payload.mintNameMap[0].inviteCodes) {
         const inviteCodes = action.payload.mintNameMap[0].inviteCodes!;
+
+        // check if review already added to state
         const exists = state.reviews.find((r) => {
           return r.rawEvent.id === action.payload.event.id;
         });
+
+        // if review does not exist, add it to state
         if (!exists) {
-          const mintPubkey = action.payload.event.tags.find((t) => t[0] === "d")?.[1];
+          const mintPubkey = action.payload.event.tags.find(
+            (t) => t[0] === "d",
+          )?.[1];
           state.reviews = [
             ...state.reviews,
             {
@@ -283,7 +307,11 @@ const nip87Slice = createSlice({
               mintPubkey,
             },
           ];
-          const mintInfo = state.mintInfos.find(m => m.mintPubkey === mintPubkey);
+
+          // update the mint info with new review data
+          const mintInfo = state.mintInfos.find(
+            (m) => m.mintPubkey === mintPubkey,
+          );
           if (mintInfo) {
             mintInfo.numReviews = mintInfo.numReviews + 1;
             mintInfo.totalRatings =
@@ -291,7 +319,7 @@ const nip87Slice = createSlice({
             mintInfo.reviewsWithRating =
               mintInfo.reviewsWithRating + (rating ? 1 : 0);
             state.mintInfos = state.mintInfos.map((m) =>
-              m.mintPubkey === mintPubkey ? mintInfo : m
+              m.mintPubkey === mintPubkey ? mintInfo : m,
             );
           }
         }
@@ -299,23 +327,23 @@ const nip87Slice = createSlice({
     },
     deleteReview(state, action: { payload: string }) {
       state.reviews = state.reviews.filter(
-        (r) => `${r.mintUrl}${r.userPubkey}` !== action.payload
+        (r) => `${r.mintUrl}${r.userPubkey}` !== action.payload,
       );
       const mintInfo = state.mintInfos.find(
-        (m) => m.mintUrl === action.payload
+        (m) => m.mintUrl === action.payload,
       );
       if (mintInfo) {
         mintInfo.numReviews = mintInfo.numReviews - 1;
         //TODO: decrement totalRatings and reviewsWithRating
         // update the mint info in the state
         state.mintInfos = state.mintInfos.map((m) =>
-          m.mintUrl === action.payload ? mintInfo : m
+          m.mintUrl === action.payload ? mintInfo : m,
         );
       }
     },
     deleteMintInfo(state, action: { payload: string }) {
       state.mintInfos = state.mintInfos.filter(
-        (mint) => `${mint.mintUrl}${mint.appPubkey}` !== action.payload
+        (mint) => `${mint.mintUrl}${mint.appPubkey}` !== action.payload,
       );
     },
   },
