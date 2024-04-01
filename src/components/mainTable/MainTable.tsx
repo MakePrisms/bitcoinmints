@@ -125,6 +125,17 @@ const MintTable = () => {
     if (router.query.mintPubkey) {
       setMintUrlToShow(router.query.mintPubkey as string);
     }
+
+    if (router.query.show) {
+      const showParam = router.query.show;
+      if (showParam === "cashu") {
+        setShowCashu(true);
+        setShowFedimint(false);
+      } else if (showParam === "fedimint") {
+        setShowCashu(false);
+        setShowFedimint(true);
+      }
+    }
   }, [router.query]);
 
   useEffect(() => {
