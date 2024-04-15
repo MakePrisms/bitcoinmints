@@ -64,17 +64,19 @@ export const addMintInfosAsync = createAsyncThunk(
     );
 
     let mintName = "";
+    let units: string[] = [];
     if (fetchedMint) {
       mintName = fetchedMint.name;
     } else {
       const mintData = await getMintInfoWithCache(mintUrls[0]);
       const { name } = mintData;
+      units = mintData.units;
       dispatch(addMintData(mintData));
       mintName = name;
     }
 
-    dispatch(addMint({ event, relay, mintName }));
-  },
+    dispatch(addMint({ event, relay, mintName, units }));
+  }
 );
 
 export const addReviewAsync = createAsyncThunk(
@@ -181,6 +183,7 @@ const nip87Slice = createSlice({
             inviteCodes: action.payload.event.tags
               .filter((t) => t[0] === "u")
               ?.map((t) => t[1]),
+            units: action.payload.units,
           },
         ];
         return;
@@ -211,6 +214,7 @@ const nip87Slice = createSlice({
               reviewsWithRating: state.reviews
                 .filter((e) => e.mintUrl === mintUrl)
                 .filter((e) => e.rating).length,
+              units: action.payload.units,
             },
           ];
         }

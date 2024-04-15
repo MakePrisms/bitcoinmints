@@ -26,6 +26,7 @@ export const getMintInfo = async (mintUrl: string): Promise<MintData> => {
     v1: false,
     supportedNuts: "",
     name: "",
+    units: [],
   };
 
   let nutSet = new Set<number>();
@@ -77,6 +78,25 @@ export const getMintInfo = async (mintUrl: string): Promise<MintData> => {
   data.supportedNuts = Array.from(nutSet)
     .sort((a, b) => a - b)
     .join(",");
+
+  const keysetsRes = await fetchWithTimeout(
+    `api/mintkeys?mintUrl=${mintUrl}`,
+    {},
+    10_000
+  );
+
+  const keysets = (await keysetsRes.json()) as any;
+
+  if (keysetsRes.status === 200) {
+    console.log(keysets);
+    const seenUnits = new Set<string>();
+    keysets.keysets.forEach((keyset: any) => {
+      if (keyset.unit && !seenUnits.has(keyset.unit)) {
+        data.units.push(keyset.unit);
+        seenUnits.add(keyset.unit);
+      }
+    });
+  }
 
   return data;
 };

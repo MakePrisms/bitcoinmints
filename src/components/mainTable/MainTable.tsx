@@ -157,11 +157,13 @@ const MintTable = () => {
 
     mintSub.on("event", (event: NDKEvent) => {
       if (event.kind === Nip87Kinds.FediInfo) {
-        const mintName = `Fedimint ${event.getMatchingTags("d")[0][1].slice(0, 3)}...${event.getMatchingTags("d")[0][1].slice(-3)}`;
-        dispatch(addMint({ event: event.rawEvent(), mintName }));
+        const mintName = `Fedimint ${event
+          .getMatchingTags("d")[0][1]
+          .slice(0, 3)}...${event.getMatchingTags("d")[0][1].slice(-3)}`;
+        dispatch(addMint({ event: event.rawEvent(), mintName, units: [] }));
       }
       dispatch(
-        addMintInfosAsync({ event: event.rawEvent(), relay: event.relay!.url }),
+        addMintInfosAsync({ event: event.rawEvent(), relay: event.relay!.url })
       );
     });
 
