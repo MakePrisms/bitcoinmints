@@ -18,7 +18,11 @@ import {
 import MintsRowItem from "./MintsRowItem";
 import TableRowEndorsement from "./ReviewsRowItem";
 import Filters from "./Filters";
-import { setMintsFilter, setReviewsFilter } from "@/redux/slices/filterSlice";
+import {
+  setMintsFilter,
+  setReviewsFilter,
+  setUnitsFilter,
+} from "@/redux/slices/filterSlice";
 import { useRouter } from "next/router";
 import { ParsedUrlQueryInput } from "querystring";
 import {
@@ -36,30 +40,16 @@ const MintTable = () => {
   const [minRating, setMinRating] = useState(0);
   const [onlyFriends, setOnlyFriends] = useState(false);
   const [showCashu, setShowCashu] = useState(true);
+  const [units, setUnits] = useState<string[]>([]);
   const [showFedimint, setShowFedimint] = useState(true);
   const [showFilters, setShowFilters] = useState(false);
   const [mintUrlToShow, setMintUrlToShow] = useState<string | undefined>();
   const tabsRef = useRef<TabsRef>(null);
   const [ratingSort, setRatingSort] = useState<"asc" | "desc" | undefined>(
-    "desc",
+    "desc"
   );
 
   const router = useRouter();
-
-  const filterProps = {
-    minReviews,
-    minRating,
-    onlyFriends,
-    showCashu,
-    showFedimint,
-    showFilters,
-    setMinReviews,
-    setMinRating,
-    setOnlyFriends,
-    setShowCashu,
-    setShowFedimint,
-    setShowFilters,
-  };
 
   const dispatch = useAppDispatch();
 
@@ -69,6 +59,33 @@ const MintTable = () => {
   const following = useSelector((state: RootState) => state.user.following);
 
   const { ndk } = useNdk();
+
+  const handleUnitChange = (unit: string) => {
+    let newQuery: ParsedUrlQueryInput = { ...router.query };
+    let newUnits;
+    if (units.includes(unit)) {
+      newUnits = units.filter((u) => u !== unit);
+    } else {
+      newUnits = [...units, unit];
+    }
+
+    setUnits(newUnits);
+
+    if (newUnits.length === 0) {
+      delete newQuery.units;
+    } else {
+      newQuery.units = `${newUnits.join(",")}`;
+    }
+
+    router.push(
+      {
+        pathname: router.pathname,
+        query: newQuery,
+      },
+      undefined,
+      { shallow: true }
+    );
+  };
 
   const handleTabChange = (tab: number) => {
     const newQuery: ParsedUrlQueryInput = { ...router.query };
@@ -93,7 +110,7 @@ const MintTable = () => {
         query: newQuery,
       },
       undefined,
-      { shallow: true },
+      { shallow: true }
     );
 
     setMintsPage(1);
@@ -104,15 +121,17 @@ const MintTable = () => {
     const states = ["desc", "asc", undefined];
     const currentIndex = states.indexOf(ratingSort);
     setRatingSort(
-      states[(currentIndex + 1) % states.length] as "asc" | "desc" | undefined,
+      states[(currentIndex + 1) % states.length] as "asc" | "desc" | undefined
     );
   };
 
+  // reset table pages when filters change
   useEffect(() => {
     setMintsPage(1);
     setReviewsPage(1);
-  }, [minReviews, minRating, onlyFriends, showCashu, showFedimint]);
+  }, [minReviews, minRating, onlyFriends, showCashu, showFedimint, units]);
 
+  // update state based on query params
   useEffect(() => {
     if (router.query.tab) {
       tabsRef.current?.setActiveTab(router.query.tab === "mints" ? 0 : 1);
@@ -136,8 +155,14 @@ const MintTable = () => {
         setShowFedimint(true);
       }
     }
+
+    if (router.query.units) {
+      const queryUnits = (router.query.units as string).split(",");
+      setUnits(queryUnits);
+    }
   }, [router.query]);
 
+  // fetch mints and reviews
   useEffect(() => {
     if (!ndk) return;
 
@@ -145,14 +170,14 @@ const MintTable = () => {
       {
         kinds: [Nip87Kinds.CashuInfo, Nip87Kinds.FediInfo],
       } as unknown as NDKFilter,
-      { closeOnEose: false },
+      { closeOnEose: false }
     );
 
     const reviewSub = ndk.subscribe(
       {
         kinds: [Nip87Kinds.Reccomendation],
       } as unknown as NDKFilter,
-      { closeOnEose: false },
+      { closeOnEose: false }
     );
 
     mintSub.on("event", (event: NDKEvent) => {
@@ -172,7 +197,7 @@ const MintTable = () => {
         addReviewAsync({
           event: event.rawEvent(),
           infoEventRelay: undefined,
-        }),
+        })
       );
     });
   }, [ndk, dispatch]);
@@ -180,6 +205,7 @@ const MintTable = () => {
   const { mintInfos: unfilteredMintInfos, reviews: unfilteredReviews } =
     useSelector((state: RootState) => state.nip87);
 
+  // set mints to show based on filters
   useEffect(() => {
     const filteredMintInfos = unfilteredMintInfos.filter((mint) => {
       const avgRating = mint.totalRatings / mint.reviewsWithRating;
@@ -204,6 +230,13 @@ const MintTable = () => {
         return false;
       }
 
+      if (
+        filters.units.length > 0 &&
+        !mint.units.some((unit) => filters.units.includes(unit))
+      ) {
+        return false;
+      }
+
       return true;
     });
     setMintInfos(filteredMintInfos);
@@ -212,8 +245,10 @@ const MintTable = () => {
     filters.mints,
     filters.reviews.showFedimint,
     filters.reviews.showCashu,
+    filters.units,
   ]);
 
+  // set reviews to show based on filters
   useEffect(() => {
     const filteredReviews = unfilteredReviews.filter((review) => {
       if (filters.reviews.friends && !following.includes(review.userPubkey)) {
@@ -253,9 +288,30 @@ const MintTable = () => {
 
   useEffect(() => {
     dispatch(
-      setReviewsFilter({ friends: onlyFriends, showCashu, showFedimint }),
+      setReviewsFilter({ friends: onlyFriends, showCashu, showFedimint })
     );
   }, [onlyFriends, showCashu, showFedimint]);
+
+  useEffect(() => {
+    dispatch(setUnitsFilter(units));
+  }, [units]);
+
+  const filterProps = {
+    minReviews,
+    minRating,
+    onlyFriends,
+    showCashu,
+    showFedimint,
+    units,
+    showFilters,
+    setMinReviews,
+    setMinRating,
+    setOnlyFriends,
+    setShowCashu,
+    setShowFedimint,
+    handleUnitChange,
+    setShowFilters,
+  };
 
   return (
     <div className="w-full">
@@ -284,7 +340,7 @@ const MintTable = () => {
                   </div>
                 </Table.HeadCell>
                 <Table.HeadCell>URL</Table.HeadCell>
-                <Table.HeadCell>Supported Nuts</Table.HeadCell>
+                <Table.HeadCell>Supported</Table.HeadCell>
                 <Table.HeadCell>
                   <span className="sr-only">Review</span>
                 </Table.HeadCell>
@@ -293,7 +349,7 @@ const MintTable = () => {
                 {mintInfos
                   .slice(
                     mintsPage * maxPerPage - maxPerPage,
-                    mintsPage * maxPerPage,
+                    mintsPage * maxPerPage
                   )
                   .sort((a, b) => {
                     const aRating =
@@ -345,7 +401,7 @@ const MintTable = () => {
                 {reviews
                   .slice(
                     reviewsPage * maxPerPage - maxPerPage,
-                    reviewsPage * maxPerPage,
+                    reviewsPage * maxPerPage
                   )
                   .map((review, idx) => (
                     <TableRowEndorsement review={review} key={idx} />
