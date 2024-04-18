@@ -251,6 +251,15 @@ const MintTable = () => {
   // set reviews to show based on filters
   useEffect(() => {
     const filteredReviews = unfilteredReviews.filter((review) => {
+      if (
+        !mintInfos.some(
+          (m) =>
+            m.mintUrl === review.mintUrl || m.mintPubkey === review.mintPubkey
+        )
+      ) {
+        console.log("mint not found", review.mintUrl, review.mintPubkey);
+        return false;
+      }
       if (filters.reviews.friends && !following.includes(review.userPubkey)) {
         return false;
       }
@@ -277,10 +286,30 @@ const MintTable = () => {
         return false;
       }
 
+      if (units.length > 0) {
+        const mintInfo = unfilteredMintInfos.find(
+          (mint) =>
+            mint.mintUrl === review.mintUrl ||
+            mint.mintPubkey === review.mintPubkey
+        );
+        console.log("found", mintInfo?.units);
+        if (!mintInfo) return false;
+        if (!mintInfo.units.some((unit) => units.includes(unit))) {
+          return false;
+        }
+      }
+
       return true;
     });
     setReviews(filteredReviews);
-  }, [unfilteredReviews, filters.reviews, following, mintUrlToShow]);
+  }, [
+    unfilteredReviews,
+    filters.reviews,
+    following,
+    mintUrlToShow,
+    units,
+    mintInfos,
+  ]);
 
   useEffect(() => {
     dispatch(setMintsFilter({ minReviews, minRating }));
