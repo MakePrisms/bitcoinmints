@@ -13,7 +13,7 @@ const ListMintButton = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [mintUrl, setMintUrl] = useState("");
   const [mintPubkey, setMintPubkey] = useState("");
-  const [inviteCodes, setInviteCodes] = useState<string[]>([]);
+  const [inviteCode, setInviteCode] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
 
   const mints = useSelector((state: RootState) => state.nip87.mintInfos);
@@ -28,14 +28,14 @@ const ListMintButton = () => {
     setIsModalOpen(false);
     setIsProcessing(false);
     setMintUrl("");
-    setInviteCodes([]);
+    setInviteCode("");
     setMintPubkey("");
   };
 
   const handleListFedimint = async () => {
     const mintInfoEvent = await nip87Info(ndk, Nip87MintTypes.Fedimint, {
       mintPubkey,
-      inviteCodes,
+      inviteCodes: [inviteCode],
     });
 
     console.log("mintInfoEvent", mintInfoEvent.rawEvent());
@@ -64,7 +64,7 @@ const ListMintButton = () => {
 
     setIsProcessing(true);
 
-    if (!mintUrl && mintPubkey && inviteCodes) {
+    if (!mintUrl && mintPubkey && inviteCode) {
       return await handleListFedimint();
     }
 
@@ -86,7 +86,7 @@ const ListMintButton = () => {
 
       if (!pubkey)
         alert(
-          "Your mint does not return a pubkey from the /info endpoint. You should add one and try again, but you can continue without it.",
+          "Your mint does not return a pubkey from the /info endpoint. You should add one and try again, but you can continue without it."
         );
 
       const mintInfoEvent = await nip87Info(ndk, Nip87MintTypes.Cashu, {
@@ -122,8 +122,8 @@ const ListMintButton = () => {
         isProcessing={isProcessing}
         mintPubkey={mintPubkey}
         setMintPubkey={setMintPubkey}
-        inviteCodes={inviteCodes}
-        setInviteCodes={setInviteCodes}
+        inviteCode={inviteCode}
+        setInviteCode={setInviteCode}
       />
     </div>
   );

@@ -14,6 +14,7 @@ import FediCodesModal from "../modals/FediCodesModal";
 const MintsRowItem = ({ mint }: { mint: Nip87MintInfo }) => {
   const [copied, setCopied] = useState(false);
   const [showFediCodesModal, setShowFediCodesModal] = useState(false);
+  const [modules, setModules] = useState<string>("");
   const [reviewData, setReviewData] = useState<{
     avgRating: number;
     numReviewsWithRating: number;
@@ -79,6 +80,27 @@ const MintsRowItem = ({ mint }: { mint: Nip87MintInfo }) => {
     );
   };
 
+  useEffect(() => {
+    if (
+      !mint.supportedNuts &&
+      mint.inviteCodes &&
+      mint.inviteCodes.length > 0
+    ) {
+      const inviteCode = mint.inviteCodes[0];
+      const fetchModulesUrl = `https://fmo.sirion.io/config/${inviteCode}/module_kinds`;
+
+      // Fetch modules from the URL
+      fetch(fetchModulesUrl)
+        .then((response) => response.json())
+        .then((data) => {
+          setModules(data.join(", ").toUpperCase());
+        })
+        .catch((error) => {
+          console.error("Error fetching modules:", error);
+        });
+    }
+  }, [mint]);
+
   return (
     <>
       <Table.Row className="dark:bg-gray-800">
@@ -113,15 +135,19 @@ const MintsRowItem = ({ mint }: { mint: Nip87MintInfo }) => {
         {/*  Mint Url */}
         <Table.Cell className="hover:cursor-pointer" onClick={handleCopy}>
           <div className="flex">
-            {shortenString(mint.mintUrl || "Invite Codes")}
             {copied ? (
               <BsClipboard2CheckFill className="ml-1 mt-1" size={15} />
             ) : (
               <BsClipboard2 className="ml-1 mt-1" size={15} />
             )}
+            {shortenString(mint.mintUrl || mint.inviteCodes![0])}
           </div>
         </Table.Cell>
-        <Table.Cell>{mint.supportedNuts || "N/A"}</Table.Cell>
+        <Table.Cell>
+          {mint.supportedNuts
+            ? "NUTS: " + mint.supportedNuts
+            : "MODULES: " + modules}
+        </Table.Cell>
         <Table.Cell>
           {user.pubkey === mint.appPubkey ? (
             <Tooltip content="Attempt to delete">

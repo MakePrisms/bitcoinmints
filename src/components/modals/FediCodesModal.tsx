@@ -16,7 +16,7 @@ const FediCodesModal = ({
   if (inviteCodes === undefined || inviteCodes.length === 0) return null;
   return (
     <Modal show={show} onClose={() => setShow(false)}>
-      <Modal.Header>Invite Codes</Modal.Header>
+      <Modal.Header>Invite Code</Modal.Header>
       <Modal.Body>
         <List>
           {inviteCodes.map((code, i) => (

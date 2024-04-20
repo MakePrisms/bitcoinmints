@@ -41,7 +41,7 @@ const MintTable = () => {
   const [mintUrlToShow, setMintUrlToShow] = useState<string | undefined>();
   const tabsRef = useRef<TabsRef>(null);
   const [ratingSort, setRatingSort] = useState<"asc" | "desc" | undefined>(
-    "desc",
+    "desc"
   );
 
   const router = useRouter();
@@ -93,7 +93,7 @@ const MintTable = () => {
         query: newQuery,
       },
       undefined,
-      { shallow: true },
+      { shallow: true }
     );
 
     setMintsPage(1);
@@ -104,7 +104,7 @@ const MintTable = () => {
     const states = ["desc", "asc", undefined];
     const currentIndex = states.indexOf(ratingSort);
     setRatingSort(
-      states[(currentIndex + 1) % states.length] as "asc" | "desc" | undefined,
+      states[(currentIndex + 1) % states.length] as "asc" | "desc" | undefined
     );
   };
 
@@ -145,23 +145,38 @@ const MintTable = () => {
       {
         kinds: [Nip87Kinds.CashuInfo, Nip87Kinds.FediInfo],
       } as unknown as NDKFilter,
-      { closeOnEose: false },
+      { closeOnEose: false }
     );
 
     const reviewSub = ndk.subscribe(
       {
         kinds: [Nip87Kinds.Reccomendation],
       } as unknown as NDKFilter,
-      { closeOnEose: false },
+      { closeOnEose: false }
     );
 
-    mintSub.on("event", (event: NDKEvent) => {
+    mintSub.on("event", async (event: NDKEvent) => {
       if (event.kind === Nip87Kinds.FediInfo) {
-        const mintName = `Fedimint ${event.getMatchingTags("d")[0][1].slice(0, 3)}...${event.getMatchingTags("d")[0][1].slice(-3)}`;
+        // Fetch the mint name with fedimint observer
+        const inviteCode = event.getMatchingTags("u")[0]?.[1];
+        const response = await fetch(
+          `https://fmo.sirion.io/config/${inviteCode}/meta`
+        );
+        const data = await response.json();
+        let mintName = "Fedimint: ";
+        if (!data.federation_name) {
+          mintName =
+            mintName +
+            `${event.getMatchingTags("d")[0][1].slice(0, 3)}...${event
+              .getMatchingTags("d")[0][1]
+              .slice(-3)}`;
+        } else {
+          mintName = mintName + data.federation_name;
+        }
         dispatch(addMint({ event: event.rawEvent(), mintName }));
       }
       dispatch(
-        addMintInfosAsync({ event: event.rawEvent(), relay: event.relay!.url }),
+        addMintInfosAsync({ event: event.rawEvent(), relay: event.relay!.url })
       );
     });
 
@@ -170,7 +185,7 @@ const MintTable = () => {
         addReviewAsync({
           event: event.rawEvent(),
           infoEventRelay: undefined,
-        }),
+        })
       );
     });
   }, [ndk, dispatch]);
@@ -251,7 +266,7 @@ const MintTable = () => {
 
   useEffect(() => {
     dispatch(
-      setReviewsFilter({ friends: onlyFriends, showCashu, showFedimint }),
+      setReviewsFilter({ friends: onlyFriends, showCashu, showFedimint })
     );
   }, [onlyFriends, showCashu, showFedimint]);
 
@@ -282,7 +297,7 @@ const MintTable = () => {
                   </div>
                 </Table.HeadCell>
                 <Table.HeadCell>URL</Table.HeadCell>
-                <Table.HeadCell>Supported Nuts</Table.HeadCell>
+                <Table.HeadCell>Supported</Table.HeadCell>
                 <Table.HeadCell>
                   <span className="sr-only">Review</span>
                 </Table.HeadCell>
@@ -291,7 +306,7 @@ const MintTable = () => {
                 {mintInfos
                   .slice(
                     mintsPage * maxPerPage - maxPerPage,
-                    mintsPage * maxPerPage,
+                    mintsPage * maxPerPage
                   )
                   .sort((a, b) => {
                     const aRating =
@@ -343,7 +358,7 @@ const MintTable = () => {
                 {reviews
                   .slice(
                     reviewsPage * maxPerPage - maxPerPage,
-                    reviewsPage * maxPerPage,
+                    reviewsPage * maxPerPage
                   )
                   .map((review, idx) => (
                     <TableRowEndorsement review={review} key={idx} />
