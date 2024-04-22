@@ -110,10 +110,10 @@ const ListMintButton = () => {
   return (
     <div>
       {user.pubkey ? (
-        <Button onClick={() => setIsModalOpen(true)}>List a Mint</Button>
+        <Button onClick={() => setIsModalOpen(true)}>List Mint</Button>
       ) : (
         <Button onClick={() => alert("You must be logged in to review a mint")}>
-          List a Mint
+          List
         </Button>
       )}
       <ListReviewModal

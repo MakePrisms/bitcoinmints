@@ -14,6 +14,7 @@ import {
 } from "@/types/bitcoinMintsApi";
 import { copyToClipboard, shortenString } from "@/utils";
 import { BsClipboard2, BsClipboard2CheckFill } from "react-icons/bs";
+import CreateMintDisclaimer from "@/components/CreateMintDisclaimer";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -126,6 +127,7 @@ export default function Home() {
       <main
         className={`flex min-h-screen flex-col items-center justify-start md:px-24 md:py-12 py-6 ${inter.className}`}
       >
+        <CreateMintDisclaimer />
         <Button className="mb-5" onClick={handleOpenCreateMintModal}>
           Create a Mint
         </Button>
@@ -134,29 +136,32 @@ export default function Home() {
           show={showCreateMintModal}
           handleClose={handleCloseCreateMintModal}
         />
-        <div className="flex flex-col justify-center">
-          <h1 className="text-2xl font-bold underline mb-5">Your Mints</h1>
-          {/* {mintData && mintData.length > 0 && ( */}
-          <Table className="overflow-x-auto w-full">
-            <Table.Head>
-              <Table.HeadCell>URL</Table.HeadCell>
-              <Table.HeadCell>Name</Table.HeadCell>
-              <Table.HeadCell>Units</Table.HeadCell>
-              <Table.HeadCell>Created</Table.HeadCell>
-            </Table.Head>
-            {!loadingMints ? (
-              <Table.Body className="divide-y">
-                {mintData?.map((mint, idx) => (
-                  <MintDataRow mint={mint} key={idx} />
-                ))}
-              </Table.Body>
-            ) : (
-              <div className="flex flex-col items-center w-full mt-5">
-                <Spinner />
-                <p>Loading mints...</p>
-              </div>
-            )}
-          </Table>
+        <div className="w-full flex flex-col items-center">
+          <h1 className="text-2xl font-bold underline mb-5 self-start ml-3">
+            Your Mints
+          </h1>
+          <div className="overflow-x-auto w-full">
+            <Table className="min-w-max">
+              <Table.Head>
+                <Table.HeadCell>URL</Table.HeadCell>
+                <Table.HeadCell>Name</Table.HeadCell>
+                <Table.HeadCell>Units</Table.HeadCell>
+                <Table.HeadCell>Created</Table.HeadCell>
+              </Table.Head>
+              {!loadingMints ? (
+                <Table.Body className="divide-y">
+                  {mintData?.map((mint, idx) => (
+                    <MintDataRow mint={mint} key={idx} />
+                  ))}
+                </Table.Body>
+              ) : (
+                <div className="flex flex-col items-center w-full mt-5">
+                  <Spinner />
+                  <p>Loading mints...</p>
+                </div>
+              )}
+            </Table>
+          </div>
         </div>
       </main>
       <Footer />
