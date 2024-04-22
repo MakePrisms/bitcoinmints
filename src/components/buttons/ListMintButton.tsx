@@ -113,7 +113,7 @@ const ListMintButton = () => {
         <Button onClick={() => setIsModalOpen(true)}>List Mint</Button>
       ) : (
         <Button onClick={() => alert("You must be logged in to review a mint")}>
-          List
+          List Mint
         </Button>
       )}
       <ListReviewModal
