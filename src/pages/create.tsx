@@ -18,8 +18,8 @@ import CreateMintDisclaimer from "@/components/CreateMintDisclaimer";
 
 const inter = Inter({ subsets: ["latin"] });
 
-// const baseMintUrl = "https://mint.bitcoinmints.com";
-const baseMintUrl = "http://localhost:5019";
+const baseMintUrl = "https://mint.bitcoinmints.com";
+// const baseMintUrl = "http://localhost:5019";
 
 const MintDataRow = ({ mint }: { mint: CreateMintResponse }) => {
   const [copied, setCopied] = useState(false);
