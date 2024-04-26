@@ -6,6 +6,7 @@ import NDK, {
   NDKUserProfile,
   NostrEvent,
 } from "@nostr-dev-kit/ndk";
+import { calculateSha256 } from "@/utils";
 
 interface NDKContextProps {
   ndk: NDK;
@@ -14,6 +15,11 @@ interface NDKContextProps {
   fetchUserProfile: (pubkey: string) => Promise<NDKUserProfile | undefined>;
   fetchFollowingPubkeys: (pubkey: string) => Promise<string[]>;
   attemptDeleteEvent: (event: NostrEvent) => Promise<NDKEvent>;
+  generateNip98Header: (
+    requestUrl: string,
+    httpMethod: string,
+    blob: Blob | undefined
+  ) => Promise<string>;
 }
 
 const NDKContext = createContext<NDKContextProps>({
@@ -21,10 +27,15 @@ const NDKContext = createContext<NDKContextProps>({
   setSigner: (signer: NDKSigner) => {},
   removeSigner: () => {},
   fetchUserProfile: async (pubkey: string): Promise<NDKUserProfile> =>
-    ({}) as NDKUserProfile,
+    ({} as NDKUserProfile),
   fetchFollowingPubkeys: async (pubkey: string): Promise<string[]> => [],
   attemptDeleteEvent: async (event: NostrEvent): Promise<NDKEvent> =>
-    ({}) as NDKEvent,
+    ({} as NDKEvent),
+  generateNip98Header: async (
+    requestUrl: string,
+    httpMethod: string,
+    blob: Blob | undefined
+  ) => "",
 });
 
 const defaultRelays = [
@@ -79,6 +90,29 @@ export const NDKProvider = ({ children }: any) => {
     return deleted;
   };
 
+  const generateNip98Header = async (
+    requestUrl: string,
+    httpMethod: string,
+    blob: Blob | undefined
+  ): Promise<string> => {
+    const event = new NDKEvent(ndk.current, {
+      kind: NDKKind.HttpAuth,
+      tags: [
+        ["u", requestUrl],
+        ["method", httpMethod],
+      ],
+    } as NostrEvent);
+
+    if (["POST", "PUT", "PATCH"].includes(httpMethod) && blob) {
+      const sha256Hash = await calculateSha256(blob);
+      event.tags.push(["payload", sha256Hash]);
+    }
+
+    await event.sign();
+    const encodedEvent = btoa(JSON.stringify(event.rawEvent()));
+    return `Nostr ${encodedEvent}`;
+  };
+
   const contextValue: NDKContextProps = {
     ndk: ndk.current,
     setSigner,
@@ -86,6 +120,7 @@ export const NDKProvider = ({ children }: any) => {
     fetchUserProfile,
     fetchFollowingPubkeys,
     attemptDeleteEvent,
+    generateNip98Header,
   };
 
   return (

@@ -9,12 +9,14 @@ interface FiltersProps {
   onlyFriends: boolean;
   showCashu: boolean;
   showFedimint: boolean;
+  units: string[];
   showFilters: boolean;
   setMinReviews: (minReviews: number) => void;
   setMinRating: (minRating: number) => void;
   setOnlyFriends: (onlyFriends: boolean) => void;
   setShowCashu: (showCashu: boolean) => void;
   setShowFedimint: (showFedi: boolean) => void;
+  handleUnitChange: (units: string) => void;
   setShowFilters: (showFilters: boolean) => void;
 }
 
@@ -24,12 +26,14 @@ const MintFilters = ({
   onlyFriends,
   showCashu,
   showFedimint,
+  units,
   showFilters,
   setMinReviews,
   setMinRating,
   setOnlyFriends,
   setShowCashu,
   setShowFedimint,
+  handleUnitChange,
   setShowFilters,
 }: FiltersProps) => {
   const loggedIn = useSelector((state: RootState) => state.user.pubkey !== "");
@@ -121,6 +125,29 @@ const MintFilters = ({
                 className="mr-2"
               />
               <label htmlFor="mint-type-fedi">Fedimint</label>
+            </div>
+          </div>
+          <div>
+            <div>
+              <label htmlFor="units">Units</label>
+              <div>
+                <Checkbox
+                  id="unit-sat"
+                  checked={units.includes("sat")}
+                  onChange={() => handleUnitChange("sat")}
+                  className="mr-2"
+                />
+                <label htmlFor="unit-sat">Sats</label>
+              </div>
+              <div>
+                <Checkbox
+                  id="unit-usd"
+                  checked={units.includes("usd")}
+                  onChange={() => handleUnitChange("usd")}
+                  className="mr-2"
+                />
+                <label htmlFor="unit-usd">USD</label>
+              </div>
             </div>
           </div>
         </form>

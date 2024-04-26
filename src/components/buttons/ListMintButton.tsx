@@ -45,7 +45,9 @@ const ListMintButton = () => {
       const fedId = mintInfoEvent.getMatchingTags("d")[0][1];
       mintName = `Fedimint ${fedId.slice(0, 3)}...${fedId.slice(-3)}`;
     }
-    dispatch(addMint({ event: mintInfoEvent.rawEvent(), mintName }));
+    dispatch(
+      addMint({ event: mintInfoEvent.rawEvent(), mintName, units: ["n/a"] })
+    );
     handleModalClose();
   };
 
@@ -86,7 +88,7 @@ const ListMintButton = () => {
 
       if (!pubkey)
         alert(
-          "Your mint does not return a pubkey from the /info endpoint. You should add one and try again, but you can continue without it.",
+          "Your mint does not return a pubkey from the /info endpoint. You should add one and try again, but you can continue without it."
         );
 
       const mintInfoEvent = await nip87Info(ndk, Nip87MintTypes.Cashu, {
@@ -97,7 +99,9 @@ const ListMintButton = () => {
 
       console.log("mintInfoEvent", mintInfoEvent.rawEvent());
       await mintInfoEvent.publish();
-      dispatch(addMint({ event: mintInfoEvent.rawEvent(), mintName }));
+      dispatch(
+        addMint({ event: mintInfoEvent.rawEvent(), mintName, units: ["n/a"] })
+      );
       handleModalClose();
     } catch (e) {
       console.error(e);
@@ -106,10 +110,10 @@ const ListMintButton = () => {
   return (
     <div>
       {user.pubkey ? (
-        <Button onClick={() => setIsModalOpen(true)}>List a Mint</Button>
+        <Button onClick={() => setIsModalOpen(true)}>List Mint</Button>
       ) : (
         <Button onClick={() => alert("You must be logged in to review a mint")}>
-          List a Mint
+          List Mint
         </Button>
       )}
       <ListReviewModal

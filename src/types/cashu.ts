@@ -13,5 +13,6 @@ export type MintData = {
   v1: boolean;
   supportedNuts: string;
   name: string;
+  units: string[];
   pubkey?: string;
 };

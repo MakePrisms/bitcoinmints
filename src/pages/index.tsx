@@ -1,10 +1,12 @@
 import { Inter } from "next/font/google";
+import Link from "next/link";
 import Header from "@/components/Header";
 import ReviewMintButton from "@/components/buttons/ReviewMintButton";
 import ListMintButton from "@/components/buttons/ListMintButton";
 import MainTable from "@/components/mainTable/MainTable";
 import Footer from "@/components/Footer";
 import Head from "next/head";
+import { Button } from "flowbite-react";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -22,7 +24,10 @@ export default function Home() {
       >
         <div className="flex justify-around mb-6 md:mb-12 w-full">
           <ListMintButton />
-          <ReviewMintButton text="Review a Mint" />
+          {/* <Link href={"/create"}>
+            <Button>Create Mint</Button>
+          </Link> */}
+          <ReviewMintButton text="Review Mint" />
         </div>
         <MainTable />
       </main>

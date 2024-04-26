@@ -121,7 +121,20 @@ const MintsRowItem = ({ mint }: { mint: Nip87MintInfo }) => {
             )}
           </div>
         </Table.Cell>
-        <Table.Cell>{mint.supportedNuts || "N/A"}</Table.Cell>
+
+        {/* Supported */}
+        <Table.Cell>
+          <div>
+            <p>
+              <strong>Nuts: </strong>
+              {mint.supportedNuts || "N/A"}
+            </p>
+            <p>
+              <strong>Units: </strong>
+              {mint.units.join(", ") || "N/A"}
+            </p>
+          </div>
+        </Table.Cell>
         <Table.Cell>
           {user.pubkey === mint.appPubkey ? (
             <Tooltip content="Attempt to delete">

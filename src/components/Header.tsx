@@ -6,6 +6,7 @@ import { useNdk } from "@/hooks/useNdk";
 import { RootState } from "@/redux/store";
 import { setFollowing, setUser } from "@/redux/slices/UserSlice";
 import { Avatar, Button, Dropdown, Navbar } from "flowbite-react";
+import Link from "next/link";
 
 const Header = () => {
   const [loggedIn, setLoggedIn] = useState(false);
@@ -30,12 +31,12 @@ const Header = () => {
 
   useEffect(() => {
     const userProfile = JSON.parse(
-      window.localStorage.getItem("profile") || "{}",
+      window.localStorage.getItem("profile") || "{}"
     );
     const { pubkey, image, username } = userProfile;
     if (pubkey) {
       dipsatch(
-        setUser({ pubkey: pubkey, image: image || "", name: username || "" }),
+        setUser({ pubkey: pubkey, image: image || "", name: username || "" })
       );
       setSigner(new NDKNip07Signer());
     }
@@ -50,7 +51,7 @@ const Header = () => {
   const handleLogin = async () => {
     if (!window.nostr) {
       alert(
-        "Nip07 extension not found. Get an extenstion then try again: https://github.com/aljazceru/awesome-nostr?tab=readme-ov-file#nip-07-browser-extensions",
+        "Nip07 extension not found. Get an extenstion then try again: https://github.com/aljazceru/awesome-nostr?tab=readme-ov-file#nip-07-browser-extensions"
       );
       return;
     }
@@ -63,7 +64,7 @@ const Header = () => {
             pubkey,
             image: profile?.image || "",
             name: profile?.name || profile?.displayName || "",
-          }),
+          })
         );
         window.localStorage.setItem(
           "profile",
@@ -71,7 +72,7 @@ const Header = () => {
             pubkey,
             image: profile?.image || "",
             username: profile?.name || profile?.displayName || "",
-          }),
+          })
         );
       } else {
         throw new Error("No pubkey");
@@ -87,7 +88,11 @@ const Header = () => {
       fluid
       className="bg-gradient-to-tr from-gray-800 to-gray-700 flex justify-around align-middle items-center"
     >
-      <Navbar.Brand className="md:ml-6 w-2/3 md:w-1/3 md:my-1 lg:w-1/4">
+      <Navbar.Brand
+        as={Link}
+        href="/"
+        className="md:ml-6 w-2/3 md:w-1/3 md:my-1 lg:w-1/4"
+      >
         <img src="/bitcoinmintslogo.png" alt="" />
       </Navbar.Brand>
       <div className="flex justify-end md:order-2 md:mr-6">

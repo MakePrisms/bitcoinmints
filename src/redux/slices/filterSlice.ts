@@ -10,6 +10,7 @@ interface FilterState {
     minRating: number;
     minReviews: number;
   };
+  units: string[];
 }
 
 const initialState: FilterState = {
@@ -22,6 +23,7 @@ const initialState: FilterState = {
     minRating: 0,
     minReviews: 0,
   },
+  units: [],
 };
 
 export const filterSlice = createSlice({
@@ -34,9 +36,13 @@ export const filterSlice = createSlice({
     setReviewsFilter: (state, action) => {
       state.reviews = action.payload;
     },
+    setUnitsFilter: (state, action) => {
+      state.units = action.payload;
+    },
   },
 });
 
-export const { setMintsFilter, setReviewsFilter } = filterSlice.actions;
+export const { setMintsFilter, setReviewsFilter, setUnitsFilter } =
+  filterSlice.actions;
 
 export default filterSlice.reducer;

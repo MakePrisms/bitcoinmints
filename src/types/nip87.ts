@@ -24,10 +24,11 @@ export type Nip87MintInfo = {
   numReviews: number;
   totalRatings: number;
   reviewsWithRating: number;
+  units: string[];
 };
 
 export function isNip87MintInfo(
-  mint: Nip87MintInfo | Nip87ReccomendationData,
+  mint: Nip87MintInfo | Nip87ReccomendationData
 ): mint is Nip87MintInfo {
   return (mint as Nip87MintInfo).appPubkey !== undefined;
 }
