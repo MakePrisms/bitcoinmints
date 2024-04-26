@@ -24,6 +24,9 @@ export type CreateMintResponse = {
   maxPegIn: number;
   maxPegOut: number;
   backendId: string;
+  keysets?: {
+    unit: string;
+  }[];
 };
 
 export type FetchMintsResponse = CreateMintResponse[];

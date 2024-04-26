@@ -18,7 +18,8 @@ import CreateMintDisclaimer from "@/components/CreateMintDisclaimer";
 
 const inter = Inter({ subsets: ["latin"] });
 
-const baseMintUrl = "https://mint.bitcoinmints.com";
+// const baseMintUrl = "https://mint.bitcoinmints.com";
+const baseMintUrl = "http://localhost:5019";
 
 const MintDataRow = ({ mint }: { mint: CreateMintResponse }) => {
   const [copied, setCopied] = useState(false);
@@ -45,6 +46,11 @@ const MintDataRow = ({ mint }: { mint: CreateMintResponse }) => {
     }
   };
 
+  let units = "N/A";
+  if (mint.keysets?.length) {
+    units = mint.keysets.map((k) => k.unit).join(", ");
+  }
+
   return (
     <Table.Row className="dark:bg-gray-800">
       <Table.Cell className="hover:cursor-pointer" onClick={handleCopy}>
@@ -58,7 +64,7 @@ const MintDataRow = ({ mint }: { mint: CreateMintResponse }) => {
         </div>
       </Table.Cell>
       <Table.Cell>{mint.name}</Table.Cell>
-      <Table.Cell>{"N/A"}</Table.Cell>
+      <Table.Cell>{units}</Table.Cell>
       <Table.Cell>{formattedDate}</Table.Cell>
     </Table.Row>
   );
