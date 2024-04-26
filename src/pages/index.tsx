@@ -24,9 +24,9 @@ export default function Home() {
       >
         <div className="flex justify-around mb-6 md:mb-12 w-full">
           <ListMintButton />
-          <Link href={"/create"}>
+          {/* <Link href={"/create"}>
             <Button>Create Mint</Button>
-          </Link>
+          </Link> */}
           <ReviewMintButton text="Review Mint" />
         </div>
         <MainTable />
