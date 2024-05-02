@@ -161,8 +161,10 @@ const ReviewMintButton = ({
         review={review}
         setReview={setReview}
         isProcessing={isProcessing}
-        inviteCodes={mint?.inviteCodes ? mint?.inviteCodes : inviteCodes}
-        setInviteCodes={mint?.inviteCodes ? () => {} : setInviteCodes}
+        // inviteCodes={mint?.inviteCodes ? mint?.inviteCodes : inviteCodes}
+        // setInviteCodes={mint?.inviteCodes ? () => {} : setInviteCodes}
+        inviteCode=""
+        setInviteCode={() => {}}
       />
     </div>
   );
