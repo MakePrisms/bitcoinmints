@@ -67,12 +67,14 @@ export const addMintInfosAsync = createAsyncThunk(
     let units: string[] = [];
     if (fetchedMint) {
       mintName = fetchedMint.name;
-    } else {
+    } else if (!mintUrls[0].startsWith("fed")) {
       const mintData = await getMintInfoWithCache(mintUrls[0]);
       const { name } = mintData;
       units = mintData.units;
       dispatch(addMintData(mintData));
       mintName = name;
+    } else {
+      mintName = "Fedimint";
     }
 
     dispatch(addMint({ event, relay, mintName, units }));

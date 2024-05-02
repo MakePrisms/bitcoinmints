@@ -8,46 +8,104 @@ import {
   Textarea,
   Tabs,
 } from "flowbite-react";
+import { useEffect, useState } from "react";
 
-interface FediListingModalBodyProps {
-  mintPubkey: string;
+interface FedimintListingModalBodyProps {
+  mintPubkey?: string;
   setMintPubkey: (pubkey: string) => void;
-  inviteCodes?: string[];
-  setInviteCodes?: (codes: string[]) => void;
+  inviteCode?: string;
+  setInviteCode?: (code: string) => void;
 }
 
-const FediListingModalBody = ({
+const FedimintListingModalBody = ({
   mintPubkey,
   setMintPubkey,
-  inviteCodes,
-  setInviteCodes,
-}: FediListingModalBodyProps) => (
-  <>
-    <div>
-      <div className="mb-2 block">
-        <Label>Federation ID</Label>
+  inviteCode,
+  setInviteCode,
+}: FedimintListingModalBodyProps) => {
+  const [federationMeta, setFederationMeta] = useState<any>(null); // New state for federation meta
+  const [showFederationMeta, setShowFederationMeta] = useState<boolean>(false);
+
+  useEffect(() => {
+    // Function to fetch federation ID and meta
+    const fetchFederationInfo = async (code: string) => {
+      try {
+        let response = await fetch(`https://fmo.sirion.io/config/${code}/id`);
+        if (!response.ok) {
+          throw new Error("Network response was not ok");
+        }
+        let data = await response.text();
+        setMintPubkey(data.replace(/"/g, "")); // Set the mint pubkey as the federation ID, need to remove quotes
+
+        response = await fetch(`https://fmo.sirion.io/config/${code}/meta`);
+        if (!response.ok) {
+          throw new Error("Network response was not ok");
+        }
+        data = await response.json();
+        setFederationMeta(data); // Set the entire meta JSON for inspection
+      } catch (error) {
+        console.error("There was a problem with the fetch operation:", error);
+      }
+    };
+    if (inviteCode) {
+      fetchFederationInfo(inviteCode);
+    }
+  }, [inviteCode, setMintPubkey, setFederationMeta]);
+
+  // Function to view formatted federation meta
+  const toggleFederationMeta = () => {
+    setShowFederationMeta(!showFederationMeta);
+  };
+
+  return (
+    <>
+      <div>
+        <div className="mb-2 block">
+          <Label>Invite Code</Label>
+        </div>
+        <Textarea
+          placeholder="fedxyz..."
+          id="invite-code"
+          value={inviteCode}
+          onChange={(e) => {
+            const newCode = e.target.value;
+            setInviteCode!(newCode);
+          }}
+        />
+        {mintPubkey && (
+          <div className="mt-2">
+            <Label>Federation ID:</Label>
+            <div className="text-sm">{mintPubkey}</div>
+          </div>
+        )}
+        {federationMeta?.federation_name && ( // Display federation name if available
+          <div className="mt-2">
+            <Label>Federation Name:</Label>
+            <div>{federationMeta.federation_name}</div>
+          </div>
+        )}
+        {federationMeta && !showFederationMeta && (
+          <div className="mt-2">
+            <Button onClick={toggleFederationMeta}>View Federation Meta</Button>
+          </div>
+        )}
+        {showFederationMeta && (
+          <div>
+            <div className="mt-2">
+              <Label>Federation Meta:</Label>
+            </div>
+            <div
+              className="mt-2 p-4 bg-gray-800 rounded text-sm text-white overflow-auto"
+              style={{ maxHeight: "400px" }}
+            >
+              <pre>{JSON.stringify(federationMeta, null, 2)}</pre>
+            </div>
+          </div>
+        )}
       </div>
-      <TextInput
-        placeholder="ae042fe2b1..."
-        id="mint-pubkey"
-        value={mintPubkey}
-        onChange={(e) => setMintPubkey(e.target.value)}
-        required
-      />
-    </div>
-    <div>
-      <div className="mb-2 block">
-        <Label>Invite Codes</Label>
-      </div>
-      <Textarea
-        placeholder="fedxyz..., fedabc..., fed123..."
-        id="invite-codes"
-        value={inviteCodes?.join(",")}
-        onChange={(e) => setInviteCodes!(e.target.value.split(","))}
-      />
-    </div>
-  </>
-);
+    </>
+  );
+};
 
 interface CashuListingModalBodyProps {
   mintUrl: string;
@@ -84,8 +142,8 @@ interface ReviewModalBodyProps {
   mintType: Nip87MintTypes;
   mintPubkey?: string;
   setMintPubkey?: (pubkey: string) => void;
-  inviteCodes?: string[];
-  setInviteCodes?: (codes: string[]) => void;
+  inviteCode?: string;
+  setInviteCode?: (code: string) => void;
 }
 
 const ReviewModalBody = ({
@@ -98,8 +156,8 @@ const ReviewModalBody = ({
   mintType,
   mintPubkey,
   setMintPubkey,
-  inviteCodes,
-  setInviteCodes,
+  inviteCode,
+  setInviteCode,
 }: ReviewModalBodyProps) => {
   if (mintType === Nip87MintTypes.Cashu) {
     if (mintUrl === undefined || setMintUrl === undefined) {
@@ -107,19 +165,19 @@ const ReviewModalBody = ({
     }
     if (mintPubkey || setMintPubkey) {
       throw new Error(
-        "mintPubkey and setMintPubkey are not allowed on type Cashu",
+        "mintPubkey and setMintPubkey are not allowed on type Cashu"
       );
     }
   }
   if (mintType === Nip87MintTypes.Fedimint) {
     if (mintPubkey === undefined || setMintPubkey === undefined) {
       throw new Error(
-        "mintPubkey and setMintPubkey are required on type Fedimint",
+        "mintPubkey and setMintPubkey are required on type Fedimint"
       );
     }
     if (mintUrl || setMintUrl) {
       throw new Error(
-        "mintUrl and setMintUrl are not allowed on type Fedimint",
+        "mintUrl and setMintUrl are not allowed on type Fedimint"
       );
     }
   }
@@ -128,14 +186,16 @@ const ReviewModalBody = ({
       <div>
         <div className="mb-2 block">
           <Label>
-            {mintType === Nip87MintTypes.Cashu ? "Mint URL" : "Federation ID"}
+            {mintType === Nip87MintTypes.Cashu
+              ? "Mint URL"
+              : "Federation Invite Code"}
           </Label>
         </div>
         <TextInput
           placeholder={
             mintType === Nip87MintTypes.Cashu
               ? "https://mint.example.com"
-              : "ae042fe2b1..."
+              : "fed1..."
           }
           id="mint-url"
           value={mintType === Nip87MintTypes.Cashu ? mintUrl : mintPubkey}
@@ -147,19 +207,6 @@ const ReviewModalBody = ({
           required
         />
       </div>
-      {mintType === Nip87MintTypes.Fedimint && (
-        <div>
-          <div className="mb-2 block">
-            <Label>Invite Codes</Label>
-          </div>
-          <Textarea
-            placeholder="fedxyz..., fedabc..., fed123..."
-            id="invite-codes"
-            value={inviteCodes?.join(",")}
-            onChange={(e) => setInviteCodes!(e.target.value.split(","))}
-          />
-        </div>
-      )}
       {rating !== undefined && setRating ? (
         <div>
           <Label>Rating</Label>
@@ -208,8 +255,8 @@ interface ListReviewModalProps {
   review?: string;
   setReview?: (review: string) => void;
   isProcessing: boolean;
-  inviteCodes?: string[];
-  setInviteCodes?: (codes: string[]) => void;
+  inviteCode?: string;
+  setInviteCode?: (code: string) => void;
 }
 
 const ListReviewModal = ({
@@ -226,8 +273,8 @@ const ListReviewModal = ({
   review,
   setReview,
   isProcessing,
-  inviteCodes,
-  setInviteCodes,
+  inviteCode,
+  setInviteCode,
 }: ListReviewModalProps) => {
   const title = type === "review" ? "Review Mint" : "List Mint";
   const submitText = type === "review" ? "Publish Review" : "Publish Listing";
@@ -260,7 +307,7 @@ const ListReviewModal = ({
           </Tabs.Item>
           <Tabs.Item
             title="Fedimint"
-            active={inviteCodes !== undefined && inviteCodes.length > 0}
+            active={inviteCode !== undefined && inviteCode.length > 0}
           >
             <div className="space-y-6">
               {type === "review" ? (
@@ -272,22 +319,26 @@ const ListReviewModal = ({
                   mintType={Nip87MintTypes.Fedimint}
                   mintPubkey={mintPubkey}
                   setMintPubkey={setMintPubkey}
-                  inviteCodes={inviteCodes}
-                  setInviteCodes={setInviteCodes}
+                  inviteCode={inviteCode}
+                  setInviteCode={setInviteCode}
                 />
               ) : (
-                <FediListingModalBody
+                <FedimintListingModalBody
                   mintPubkey={mintPubkey}
                   setMintPubkey={setMintPubkey}
-                  inviteCodes={inviteCodes}
-                  setInviteCodes={setInviteCodes}
+                  inviteCode={inviteCode}
+                  setInviteCode={setInviteCode}
                 />
               )}
             </div>
           </Tabs.Item>
         </Tabs>
         <div className="w-full">
-          <Button isProcessing={isProcessing} onClick={handleSubmit}>
+          <Button
+            isProcessing={isProcessing}
+            onClick={handleSubmit}
+            disabled={!mintPubkey}
+          >
             {submitText}
           </Button>
         </div>
