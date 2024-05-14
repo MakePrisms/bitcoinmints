@@ -63,8 +63,10 @@ const ReviewMintButton = ({
         return true;
       }
       if (
+        review.mintPubkey !== undefined &&
+        mint?.mintPubkey !== undefined &&
         `${review.mintPubkey}${review.userPubkey}` ===
-        `${mint?.mintPubkey}${user.pubkey}`
+          `${mint?.mintPubkey}${user.pubkey}`
       ) {
         return true;
       }
