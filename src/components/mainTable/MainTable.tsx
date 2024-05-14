@@ -270,7 +270,6 @@ const MintTable = () => {
             m.mintUrl === review.mintUrl || m.mintPubkey === review.mintPubkey
         )
       ) {
-        console.log("mint not found", review.mintUrl, review.mintPubkey);
         return false;
       }
       if (filters.reviews.friends && !following.includes(review.userPubkey)) {
@@ -305,7 +304,6 @@ const MintTable = () => {
             mint.mintUrl === review.mintUrl ||
             mint.mintPubkey === review.mintPubkey
         );
-        console.log("found", mintInfo?.units);
         if (!mintInfo) return false;
         if (!mintInfo.units.some((unit) => units.includes(unit))) {
           return false;
