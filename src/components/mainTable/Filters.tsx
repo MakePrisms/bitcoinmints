@@ -18,6 +18,7 @@ interface FiltersProps {
   setShowFedimint: (showFedi: boolean) => void;
   handleUnitChange: (units: string) => void;
   setShowFilters: (showFilters: boolean) => void;
+  handleShowTypeChange: (show: "cashu" | "fedimint") => void;
 }
 
 const MintFilters = ({
@@ -35,6 +36,7 @@ const MintFilters = ({
   setShowFedimint,
   handleUnitChange,
   setShowFilters,
+  handleShowTypeChange,
 }: FiltersProps) => {
   const loggedIn = useSelector((state: RootState) => state.user.pubkey !== "");
 
@@ -112,7 +114,7 @@ const MintFilters = ({
               <Checkbox
                 id="mint-type-cashu"
                 checked={showCashu}
-                onChange={(e) => setShowCashu(!showCashu)}
+                onChange={(e) => handleShowTypeChange("cashu")}
                 className="mr-2"
               />
               <label htmlFor="mint-type-cashu">Cashu</label>
@@ -121,7 +123,7 @@ const MintFilters = ({
               <Checkbox
                 id="mint-type-fedi"
                 checked={showFedimint}
-                onChange={(e) => setShowFedimint(!showFedimint)}
+                onChange={(e) => handleShowTypeChange("fedimint")}
                 className="mr-2"
               />
               <label htmlFor="mint-type-fedi">Fedimint</label>
