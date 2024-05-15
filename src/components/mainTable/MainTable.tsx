@@ -87,6 +87,51 @@ const MintTable = () => {
     );
   };
 
+  const handleShowTypeChange = (show: "cashu" | "fedimint") => {
+    let newQuery: ParsedUrlQueryInput = { ...router.query };
+    const showQuery = [];
+
+    if (show === "cashu") {
+      if (showCashu) {
+        // delete newQuery.show;
+        setShowCashu(false);
+      } else {
+        // newQuery.show = "cashu";
+        showQuery.push("cashu");
+        setShowCashu(true);
+        setShowFedimint(false);
+      }
+    }
+
+    if (show === "fedimint") {
+      if (showFedimint) {
+        // delete newQuery.show;
+        setShowFedimint(false);
+      } else {
+        // newQuery.show = "fedimint";
+        showQuery.push("fedimint");
+        setShowFedimint(true);
+        setShowCashu(false);
+      }
+    }
+
+    if (showQuery.length === 0) {
+      delete newQuery.show;
+    } else {
+      newQuery.show = showQuery.join(",");
+    }
+
+    // Update the query in the router
+    router.push(
+      {
+        pathname: router.pathname,
+        query: newQuery,
+      },
+      undefined,
+      { shallow: true }
+    );
+  };
+
   const handleTabChange = (tab: number) => {
     const newQuery: ParsedUrlQueryInput = { ...router.query };
 
@@ -165,13 +210,24 @@ const MintTable = () => {
   // fetch mints and reviews
   useEffect(() => {
     if (!ndk) return;
+    if (!router.isReady) return;
 
-    const mintSub = ndk.subscribe(
-      {
+    const showCashuQuery = showCashu;
+
+    let mintInfoFilter: NDKFilter;
+    if (showCashuQuery) {
+      mintInfoFilter = {
+        kinds: [Nip87Kinds.CashuInfo],
+      } as unknown as NDKFilter;
+    } else {
+      mintInfoFilter = {
         kinds: [Nip87Kinds.CashuInfo, Nip87Kinds.FediInfo],
-      } as unknown as NDKFilter,
-      { closeOnEose: false }
-    );
+      } as unknown as NDKFilter;
+    }
+
+    console.log("mintInfoFilter", mintInfoFilter);
+
+    const mintSub = ndk.subscribe(mintInfoFilter, { closeOnEose: false });
 
     const reviewSub = ndk.subscribe(
       {
@@ -213,7 +269,14 @@ const MintTable = () => {
         })
       );
     });
-  }, [ndk, dispatch]);
+  }, [
+    ndk,
+    dispatch,
+    showCashu,
+    showFedimint,
+    router.isReady,
+    router.query.show,
+  ]);
 
   const { mintInfos: unfilteredMintInfos, reviews: unfilteredReviews } =
     useSelector((state: RootState) => state.nip87);
@@ -233,14 +296,18 @@ const MintTable = () => {
         !filters.reviews.showCashu &&
         mint.rawEvent.kind === Nip87Kinds.CashuInfo
       ) {
-        return false;
+        if (filters.reviews.showFedimint) {
+          return false;
+        }
       }
 
       if (
         !filters.reviews.showFedimint &&
         mint.rawEvent.kind === Nip87Kinds.FediInfo
       ) {
-        return false;
+        if (filters.reviews.showCashu) {
+          return false;
+        }
       }
 
       if (
@@ -320,6 +387,7 @@ const MintTable = () => {
     mintUrlToShow,
     units,
     mintInfos,
+    unfilteredMintInfos,
   ]);
 
   useEffect(() => {
@@ -351,6 +419,7 @@ const MintTable = () => {
     setShowFedimint,
     handleUnitChange,
     setShowFilters,
+    handleShowTypeChange,
   };
 
   return (
