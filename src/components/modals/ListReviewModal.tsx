@@ -337,7 +337,7 @@ const ListReviewModal = ({
           <Button
             isProcessing={isProcessing}
             onClick={handleSubmit}
-            disabled={!mintPubkey}
+            disabled={!inviteCode && !mintUrl}
           >
             {submitText}
           </Button>
