@@ -9,7 +9,6 @@ import { deleteMintInfo } from "@/redux/slices/nip87Slice";
 import ReviewMintButton from "../buttons/ReviewMintButton";
 import { copyToClipboard, shortenString } from "@/utils";
 import { useRouter } from "next/router";
-import FediCodesModal from "../modals/FediCodesModal";
 
 const MintsRowItem = ({ mint }: { mint: Nip87MintInfo }) => {
   const [copied, setCopied] = useState(false);
@@ -41,10 +40,11 @@ const MintsRowItem = ({ mint }: { mint: Nip87MintInfo }) => {
 
   const handleCopy = () => {
     if (!mint.mintUrl) {
-      setShowFediCodesModal(true);
-      return;
+      const randomIndex = Math.floor(Math.random() * mint.inviteCodes!.length);
+      copyToClipboard(mint.inviteCodes![randomIndex]);
+    } else {
+      copyToClipboard(mint.mintUrl);
     }
-    copyToClipboard(mint.mintUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 3000);
   };
@@ -169,13 +169,6 @@ const MintsRowItem = ({ mint }: { mint: Nip87MintInfo }) => {
           )}
         </Table.Cell>
       </Table.Row>
-      {mint.inviteCodes && (
-        <FediCodesModal
-          inviteCodes={mint.inviteCodes!}
-          show={showFediCodesModal}
-          setShow={setShowFediCodesModal}
-        />
-      )}
     </>
   );
 };
