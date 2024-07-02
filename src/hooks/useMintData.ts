@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
-import { useSelector, useDispatch } from "react-redux";
+import { useSelector } from "react-redux";
 import { useRouter } from "next/router";
 import NDK, { NDKEvent, NDKFilter } from "@nostr-dev-kit/ndk";
-import { RootState } from "@/redux/store";
+import { RootState, useAppDispatch } from "@/redux/store";
 import {
   addMint,
   addMintInfosAsync,
@@ -33,7 +33,7 @@ const useMintData = () => {
   const [mintUrlToShow, setMintUrlToShow] = useState<string | undefined>();
 
   const router = useRouter();
-  const dispatch = useDispatch();
+  const dispatch = useAppDispatch();
   const { ndk } = useNdk();
 
   const filters = useSelector((state: RootState) => state.filters);
