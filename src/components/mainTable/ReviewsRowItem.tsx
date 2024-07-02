@@ -9,7 +9,6 @@ import { useNdk } from "@/hooks/useNdk";
 import { deleteReview } from "@/redux/slices/nip87Slice";
 import { copyToClipboard, shortenString } from "@/utils";
 import { useEffect, useState } from "react";
-import FediCodesModal from "../modals/FediCodesModal";
 
 const ReviewCell = ({ review }: { review?: string }) => {
   const [shortened, setShortened] = useState(true);
@@ -55,7 +54,6 @@ const ReviewCell = ({ review }: { review?: string }) => {
 const ReviewsRowItem = ({ review }: { review: Nip87MintReccomendation }) => {
   const [copied, setCopied] = useState(false);
   const user = useSelector((state: RootState) => state.user);
-  const [showFediCodesModal, setShowFediCodesModal] = useState(false);
 
   const dispatch = useDispatch();
 
@@ -69,9 +67,6 @@ const ReviewsRowItem = ({ review }: { review: Nip87MintReccomendation }) => {
   };
 
   const handleCopy = () => {
-    if (!review.mintUrl && review.mintType === Nip87MintTypes.Fedimint) {
-      setShowFediCodesModal(true);
-    }
     if (review.mintUrl) {
       copyToClipboard(review.mintUrl);
       setCopied(true);
@@ -88,7 +83,10 @@ const ReviewsRowItem = ({ review }: { review: Nip87MintReccomendation }) => {
         </Table.Cell>
 
         {/* Mint Name */}
-        <Table.Cell className="hover:cursor-pointer min-w-40 " onClick={handleCopy}>
+        <Table.Cell
+          className="hover:cursor-pointer min-w-40 "
+          onClick={handleCopy}
+        >
           <div className="flex">
             {review.mintName}
             {copied ? (
@@ -129,11 +127,6 @@ const ReviewsRowItem = ({ review }: { review: Nip87MintReccomendation }) => {
           )}
         </Table.Cell>
       </Table.Row>
-      <FediCodesModal
-        inviteCodes={review.inviteCodes!}
-        show={showFediCodesModal}
-        setShow={setShowFediCodesModal}
-      />
     </>
   );
 };

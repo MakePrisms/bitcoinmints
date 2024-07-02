@@ -12,7 +12,6 @@ import { useRouter } from "next/router";
 
 const MintsRowItem = ({ mint }: { mint: Nip87MintInfo }) => {
   const [copied, setCopied] = useState(false);
-  const [showFediCodesModal, setShowFediCodesModal] = useState(false);
   const [reviewData, setReviewData] = useState<{
     avgRating: number;
     numReviewsWithRating: number;
