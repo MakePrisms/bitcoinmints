@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import TableRowEndorsement from "./ReviewsRowItem";
-import useMintData from "../../nostr";
+import useMintData from "../../hooks/useMintData";
 import { Pagination, Table, Tabs, TabsRef } from "flowbite-react";
 import { useRouter } from "next/router";
 import { ParsedUrlQueryInput } from "querystring";
