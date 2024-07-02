@@ -13,7 +13,6 @@ import { useRouter } from "next/router";
 const MintsRowItem = ({ mint }: { mint: Nip87MintInfo }) => {
   const [copied, setCopied] = useState(false);
   const [showFediCodesModal, setShowFediCodesModal] = useState(false);
-  const [modules, setModules] = useState<string>("");
   const [reviewData, setReviewData] = useState<{
     avgRating: number;
     numReviewsWithRating: number;
@@ -125,9 +124,7 @@ const MintsRowItem = ({ mint }: { mint: Nip87MintInfo }) => {
         <Table.Cell>
           <div>
             <p>
-              {mint.supportedNuts
-                ? "NUTS: " + mint.supportedNuts
-                : "MODULES: " + modules}
+              {(mint.inviteCodes ? "MODULES: " : "NUTS: ") + mint.supportedNuts}
             </p>
             <p>
               <strong>Units: </strong>
