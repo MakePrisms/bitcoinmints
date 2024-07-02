@@ -1,64 +1,47 @@
-import { Tabs, Table, Pagination, TabsRef } from "flowbite-react";
-import { useSelector } from "react-redux";
-import { useEffect, useRef, useState } from "react";
-import NDK, { NDKEvent, NDKFilter } from "@nostr-dev-kit/ndk";
-import { useNdk } from "@/hooks/useNdk";
-import {
-  Nip87Kinds,
-  Nip87MintInfo,
-  Nip87MintReccomendation,
-  Nip87MintTypes,
-} from "@/types";
-import { RootState, useAppDispatch } from "@/redux/store";
-import {
-  addMint,
-  addMintInfosAsync,
-  addReviewAsync,
-} from "@/redux/slices/nip87Slice";
-import MintsRowItem from "./MintsRowItem";
+import { useRef, useState } from "react";
 import TableRowEndorsement from "./ReviewsRowItem";
-import Filters from "./Filters";
-import {
-  setMintsFilter,
-  setReviewsFilter,
-  setUnitsFilter,
-} from "@/redux/slices/filterSlice";
+import useMintData from "../../nostr";
+import { Pagination, Table, Tabs, TabsRef } from "flowbite-react";
 import { useRouter } from "next/router";
 import { ParsedUrlQueryInput } from "querystring";
+import Filters from "./Filters";
 import {
   IoIosArrowDown,
   IoIosArrowForward,
   IoIosArrowUp,
 } from "react-icons/io";
+import MintsRowItem from "./MintsRowItem";
 
 const MintTable = () => {
+  const {
+    mintInfos,
+    reviews,
+    minReviews,
+    minRating,
+    onlyFriends,
+    showCashu,
+    showFedimint,
+    units,
+    mintUrlToShow,
+    setMinReviews,
+    setMinRating,
+    setOnlyFriends,
+    setShowCashu,
+    setShowFedimint,
+    setUnits,
+    setMintUrlToShow,
+  } = useMintData();
+
   const [mintsPage, setMintsPage] = useState(1);
   const [reviewsPage, setReviewsPage] = useState(1);
-  const [mintInfos, setMintInfos] = useState<Nip87MintInfo[]>([]);
-  const [reviews, setReviews] = useState<Nip87MintReccomendation[]>([]);
-  const [minReviews, setMinReviews] = useState(0);
-  const [minRating, setMinRating] = useState(0);
-  const [onlyFriends, setOnlyFriends] = useState(false);
-  const [showCashu, setShowCashu] = useState(false);
-  const [units, setUnits] = useState<string[]>([]);
-  const [showFedimint, setShowFedimint] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
-  const [mintUrlToShow, setMintUrlToShow] = useState<string | undefined>();
   const tabsRef = useRef<TabsRef>(null);
   const [ratingSort, setRatingSort] = useState<"asc" | "desc" | undefined>(
     "desc"
   );
 
   const router = useRouter();
-
-  const dispatch = useAppDispatch();
-
   const maxPerPage = 10;
-
-  const filters = useSelector((state: RootState) => state.filters);
-  const following = useSelector((state: RootState) => state.user.following);
-
-  const { ndk } = useNdk();
 
   const handleUnitChange = (unit: string) => {
     let newQuery: ParsedUrlQueryInput = { ...router.query };
@@ -93,10 +76,8 @@ const MintTable = () => {
 
     if (show === "cashu") {
       if (showCashu) {
-        // delete newQuery.show;
         setShowCashu(false);
       } else {
-        // newQuery.show = "cashu";
         showQuery.push("cashu");
         setShowCashu(true);
         setShowFedimint(false);
@@ -105,10 +86,8 @@ const MintTable = () => {
 
     if (show === "fedimint") {
       if (showFedimint) {
-        // delete newQuery.show;
         setShowFedimint(false);
       } else {
-        // newQuery.show = "fedimint";
         showQuery.push("fedimint");
         setShowFedimint(true);
         setShowCashu(false);
@@ -121,7 +100,6 @@ const MintTable = () => {
       newQuery.show = showQuery.join(",");
     }
 
-    // Update the query in the router
     router.push(
       {
         pathname: router.pathname,
@@ -146,7 +124,6 @@ const MintTable = () => {
       setMintUrlToShow(undefined);
     }
 
-    // check if newQuery is different from router.query
     if (JSON.stringify(newQuery) === JSON.stringify(router.query)) return;
 
     router.push(
@@ -169,240 +146,6 @@ const MintTable = () => {
       states[(currentIndex + 1) % states.length] as "asc" | "desc" | undefined
     );
   };
-
-  // reset table pages when filters change
-  useEffect(() => {
-    setMintsPage(1);
-    setReviewsPage(1);
-  }, [minReviews, minRating, onlyFriends, showCashu, showFedimint, units]);
-
-  // update state based on query params
-  useEffect(() => {
-    if (router.query.tab) {
-      tabsRef.current?.setActiveTab(router.query.tab === "mints" ? 0 : 1);
-    }
-
-    if (router.query.mintUrl) {
-      setMintUrlToShow(router.query.mintUrl as string);
-    }
-
-    if (router.query.mintPubkey) {
-      setMintUrlToShow(router.query.mintPubkey as string);
-    }
-
-    if (router.query.show) {
-      const showParam = router.query.show;
-      if (showParam === "cashu") {
-        setShowCashu(true);
-        setShowFedimint(false);
-      } else if (showParam === "fedimint") {
-        setShowCashu(false);
-        setShowFedimint(true);
-      }
-    }
-
-    if (router.query.units) {
-      const queryUnits = (router.query.units as string).split(",");
-      setUnits(queryUnits);
-    }
-  }, [router.query]);
-
-  // fetch mints and reviews
-  useEffect(() => {
-    if (!ndk) return;
-    if (!router.isReady) return;
-
-    const showCashuQuery = showCashu;
-
-    let mintInfoFilter: NDKFilter;
-    if (showCashuQuery) {
-      mintInfoFilter = {
-        kinds: [Nip87Kinds.CashuInfo],
-      } as unknown as NDKFilter;
-    } else {
-      mintInfoFilter = {
-        kinds: [Nip87Kinds.CashuInfo, Nip87Kinds.FediInfo],
-      } as unknown as NDKFilter;
-    }
-
-    console.log("mintInfoFilter", mintInfoFilter);
-
-    const mintSub = ndk.subscribe(mintInfoFilter, { closeOnEose: false });
-
-    const reviewSub = ndk.subscribe(
-      {
-        kinds: [Nip87Kinds.Reccomendation],
-      } as unknown as NDKFilter,
-      { closeOnEose: false }
-    );
-
-    mintSub.on("event", async (event: NDKEvent) => {
-      if (event.kind === Nip87Kinds.FediInfo) {
-        // Fetch the mint name with fedimint observer
-        const inviteCode = event.getMatchingTags("u")[0]?.[1];
-        const response = await fetch(
-          `https://fmo.sirion.io/config/${inviteCode}/meta`
-        );
-        const data = await response.json();
-        let mintName = "Fedimint: ";
-        if (!data.federation_name) {
-          mintName =
-            mintName +
-            `${event.getMatchingTags("d")[0][1].slice(0, 3)}...${event
-              .getMatchingTags("d")[0][1]
-              .slice(-3)}`;
-        } else {
-          mintName = mintName + data.federation_name;
-        }
-        dispatch(addMint({ event: event.rawEvent(), mintName, units: [] }));
-      }
-      dispatch(
-        addMintInfosAsync({ event: event.rawEvent(), relay: event.relay!.url })
-      );
-    });
-
-    reviewSub.on("event", (event: NDKEvent) => {
-      dispatch(
-        addReviewAsync({
-          event: event.rawEvent(),
-          infoEventRelay: undefined,
-        })
-      );
-    });
-  }, [
-    ndk,
-    dispatch,
-    showCashu,
-    showFedimint,
-    router.isReady,
-    router.query.show,
-  ]);
-
-  const { mintInfos: unfilteredMintInfos, reviews: unfilteredReviews } =
-    useSelector((state: RootState) => state.nip87);
-
-  // set mints to show based on filters
-  useEffect(() => {
-    const filteredMintInfos = unfilteredMintInfos.filter((mint) => {
-      const avgRating = mint.totalRatings / mint.reviewsWithRating;
-      if (avgRating < filters.mints.minRating) {
-        return false;
-      }
-      if (mint.numReviews < filters.mints.minReviews) {
-        return false;
-      }
-
-      if (
-        !filters.reviews.showCashu &&
-        mint.rawEvent.kind === Nip87Kinds.CashuInfo
-      ) {
-        if (filters.reviews.showFedimint) {
-          return false;
-        }
-      }
-
-      if (
-        !filters.reviews.showFedimint &&
-        mint.rawEvent.kind === Nip87Kinds.FediInfo
-      ) {
-        if (filters.reviews.showCashu) {
-          return false;
-        }
-      }
-
-      if (
-        filters.units.length > 0 &&
-        !mint.units.some((unit) => filters.units.includes(unit))
-      ) {
-        return false;
-      }
-
-      return true;
-    });
-    setMintInfos(filteredMintInfos);
-  }, [
-    unfilteredMintInfos,
-    filters.mints,
-    filters.reviews.showFedimint,
-    filters.reviews.showCashu,
-    filters.units,
-  ]);
-
-  // set reviews to show based on filters
-  useEffect(() => {
-    const filteredReviews = unfilteredReviews.filter((review) => {
-      if (
-        !mintInfos.some(
-          (m) =>
-            m.mintUrl === review.mintUrl || m.mintPubkey === review.mintPubkey
-        )
-      ) {
-        return false;
-      }
-      if (filters.reviews.friends && !following.includes(review.userPubkey)) {
-        return false;
-      }
-
-      if (
-        mintUrlToShow &&
-        mintUrlToShow !== review.mintUrl &&
-        mintUrlToShow !== review.mintPubkey
-      ) {
-        return false;
-      }
-
-      if (
-        !filters.reviews.showCashu &&
-        review.mintType === Nip87MintTypes.Cashu
-      ) {
-        return false;
-      }
-
-      if (
-        !filters.reviews.showFedimint &&
-        review.mintType === Nip87MintTypes.Fedimint
-      ) {
-        return false;
-      }
-
-      if (units.length > 0) {
-        const mintInfo = unfilteredMintInfos.find(
-          (mint) =>
-            mint.mintUrl === review.mintUrl ||
-            mint.mintPubkey === review.mintPubkey
-        );
-        if (!mintInfo) return false;
-        if (!mintInfo.units.some((unit) => units.includes(unit))) {
-          return false;
-        }
-      }
-
-      return true;
-    });
-    setReviews(filteredReviews);
-  }, [
-    unfilteredReviews,
-    filters.reviews,
-    following,
-    mintUrlToShow,
-    units,
-    mintInfos,
-    unfilteredMintInfos,
-  ]);
-
-  useEffect(() => {
-    dispatch(setMintsFilter({ minReviews, minRating }));
-  }, [minReviews, minRating]);
-
-  useEffect(() => {
-    dispatch(
-      setReviewsFilter({ friends: onlyFriends, showCashu, showFedimint })
-    );
-  }, [onlyFriends, showCashu, showFedimint]);
-
-  useEffect(() => {
-    dispatch(setUnitsFilter(units));
-  }, [units]);
 
   const filterProps = {
     minReviews,
