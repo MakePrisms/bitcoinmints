@@ -80,27 +80,6 @@ const MintsRowItem = ({ mint }: { mint: Nip87MintInfo }) => {
     );
   };
 
-  useEffect(() => {
-    if (
-      !mint.supportedNuts &&
-      mint.inviteCodes &&
-      mint.inviteCodes.length > 0
-    ) {
-      const inviteCode = mint.inviteCodes[0];
-      const fetchModulesUrl = `https://fmo.sirion.io/config/${inviteCode}/module_kinds`;
-
-      // Fetch modules from the URL
-      fetch(fetchModulesUrl)
-        .then((response) => response.json())
-        .then((data) => {
-          setModules(data.join(", ").toUpperCase());
-        })
-        .catch((error) => {
-          console.error("Error fetching modules:", error);
-        });
-    }
-  }, [mint]);
-
   return (
     <>
       <Table.Row className="dark:bg-gray-800">

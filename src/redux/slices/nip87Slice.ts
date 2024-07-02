@@ -153,6 +153,7 @@ const nip87Slice = createSlice({
           relay?: string;
           mintName: string;
           units: string[];
+          supportedNuts?: string;
         };
       }
     ) {
@@ -188,6 +189,7 @@ const nip87Slice = createSlice({
               .filter((t) => t[0] === "u")
               ?.map((t) => t[1]),
             units: action.payload.units,
+            supportedNuts: action.payload.supportedNuts,
           },
         ];
         return;
