@@ -95,14 +95,19 @@ const useMintData = () => {
           addMint({
             event: event.rawEvent(),
             mintName,
-            units: ["msats"],
+            // Fedimint units are in msats
+            units: ["msat"],
             supportedNuts: modules,
           })
         );
+      } else {
+        dispatch(
+          addMintInfosAsync({
+            event: event.rawEvent(),
+            relay: event.relay?.url,
+          })
+        );
       }
-      dispatch(
-        addMintInfosAsync({ event: event.rawEvent(), relay: event.relay?.url })
-      );
     });
 
     reviewSub.on("event", (event: NDKEvent) => {
@@ -233,17 +238,17 @@ const useMintData = () => {
 
   useEffect(() => {
     dispatch(setMintsFilter({ minReviews, minRating }));
-  }, [minReviews, minRating]);
+  }, [minReviews, minRating, dispatch]);
 
   useEffect(() => {
     dispatch(
       setReviewsFilter({ friends: onlyFriends, showCashu, showFedimint })
     );
-  }, [onlyFriends, showCashu, showFedimint]);
+  }, [onlyFriends, showCashu, showFedimint, dispatch]);
 
   useEffect(() => {
     dispatch(setUnitsFilter(units));
-  }, [units]);
+  }, [units, dispatch]);
 
   return {
     mintInfos,

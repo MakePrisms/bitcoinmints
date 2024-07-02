@@ -22,7 +22,6 @@ const MintTable = () => {
     showCashu,
     showFedimint,
     units,
-    mintUrlToShow,
     setMinReviews,
     setMinRating,
     setOnlyFriends,

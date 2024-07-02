@@ -65,9 +65,12 @@ export const addMintInfosAsync = createAsyncThunk(
 
     let mintName = "";
     let units: string[] = [];
+    // Log the mint URL for debugging
+    console.log("Mint URL:", mintUrls[0]);
     if (fetchedMint) {
       mintName = fetchedMint.name;
     } else if (!mintUrls[0].startsWith("fed")) {
+      console.log("Fetching for mint URL:", mintUrls[0]);
       const mintData = await getMintInfoWithCache(mintUrls[0]);
       const { name } = mintData;
       units = mintData.units;
