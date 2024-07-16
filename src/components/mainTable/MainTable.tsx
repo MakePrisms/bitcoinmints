@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import TableRowEndorsement from "./ReviewsRowItem";
 import useMintData from "../../hooks/useMintData";
 import { Pagination, Table, Tabs, TabsRef } from "flowbite-react";
@@ -13,23 +13,7 @@ import {
 import MintsRowItem from "./MintsRowItem";
 
 const MintTable = () => {
-  const {
-    mintInfos,
-    reviews,
-    minReviews,
-    minRating,
-    onlyFriends,
-    showCashu,
-    showFedimint,
-    units,
-    setMinReviews,
-    setMinRating,
-    setOnlyFriends,
-    setShowCashu,
-    setShowFedimint,
-    setUnits,
-    setMintUrlToShow,
-  } = useMintData();
+  const { mintInfos, reviews } = useMintData();
 
   const [mintsPage, setMintsPage] = useState(1);
   const [reviewsPage, setReviewsPage] = useState(1);
@@ -42,72 +26,16 @@ const MintTable = () => {
   const router = useRouter();
   const maxPerPage = 10;
 
-  const handleUnitChange = (unit: string) => {
-    let newQuery: ParsedUrlQueryInput = { ...router.query };
-    let newUnits;
-    if (units.includes(unit)) {
-      newUnits = units.filter((u) => u !== unit);
-    } else {
-      newUnits = [...units, unit];
-    }
-
-    setUnits(newUnits);
-
-    if (newUnits.length === 0) {
-      delete newQuery.units;
-    } else {
-      newQuery.units = `${newUnits.join(",")}`;
-    }
-
-    router.push(
-      {
-        pathname: router.pathname,
-        query: newQuery,
-      },
-      undefined,
-      { shallow: true }
-    );
-  };
-
-  const handleShowTypeChange = (show: "cashu" | "fedimint") => {
-    let newQuery: ParsedUrlQueryInput = { ...router.query };
-    const showQuery = [];
-
-    if (show === "cashu") {
-      if (showCashu) {
-        setShowCashu(false);
+  useEffect(() => {
+    if (router.isReady) {
+      const tab = router.query.tab as string;
+      if (tab === "reviews") {
+        tabsRef.current?.setActiveTab(1);
       } else {
-        showQuery.push("cashu");
-        setShowCashu(true);
-        setShowFedimint(false);
+        tabsRef.current?.setActiveTab(0);
       }
     }
-
-    if (show === "fedimint") {
-      if (showFedimint) {
-        setShowFedimint(false);
-      } else {
-        showQuery.push("fedimint");
-        setShowFedimint(true);
-        setShowCashu(false);
-      }
-    }
-
-    if (showQuery.length === 0) {
-      delete newQuery.show;
-    } else {
-      newQuery.show = showQuery.join(",");
-    }
-
-    router.push(
-      {
-        pathname: router.pathname,
-        query: newQuery,
-      },
-      undefined,
-      { shallow: true }
-    );
-  };
+  }, [router.isReady, router.query.tab]);
 
   const handleTabChange = (tab: number) => {
     const newQuery: ParsedUrlQueryInput = { ...router.query };
@@ -120,7 +48,6 @@ const MintTable = () => {
     if (tab === 0 && (router.query.mintUrl || router.query.mintPubkey)) {
       delete newQuery.mintUrl;
       delete newQuery.mintPubkey;
-      setMintUrlToShow(undefined);
     }
 
     if (JSON.stringify(newQuery) === JSON.stringify(router.query)) return;
@@ -147,21 +74,8 @@ const MintTable = () => {
   };
 
   const filterProps = {
-    minReviews,
-    minRating,
-    onlyFriends,
-    showCashu,
-    showFedimint,
-    units,
     showFilters,
-    setMinReviews,
-    setMinRating,
-    setOnlyFriends,
-    setShowCashu,
-    setShowFedimint,
-    handleUnitChange,
     setShowFilters,
-    handleShowTypeChange,
   };
 
   return (

@@ -42,7 +42,7 @@ const useMintData = () => {
       onlyFriends: router.query.onlyFriends === "true",
       showCashu,
       showFedimint,
-      showAll: !showCashu && !showFedimint,
+      showAll: (!showCashu && !showFedimint) || (showCashu && showFedimint),
       units: parseUnits(router.query.units),
       mintUrlToShow: router.query.mintUrl as string | undefined,
     };
@@ -87,10 +87,15 @@ const useMintData = () => {
         filters.mintUrlToShow !== review.mintPubkey
       )
         return false;
-      if (!filters.showCashu && review.mintType === Nip87MintTypes.Cashu)
-        return false;
-      if (!filters.showFedimint && review.mintType === Nip87MintTypes.Fedimint)
-        return false;
+      if (!filters.showAll) {
+        if (!filters.showCashu && review.mintType === Nip87MintTypes.Cashu)
+          return false;
+        if (
+          !filters.showFedimint &&
+          review.mintType === Nip87MintTypes.Fedimint
+        )
+          return false;
+      }
       if (filters.units.length > 0) {
         const mintInfo = unfilteredMintInfos.find(
           (mint) =>
