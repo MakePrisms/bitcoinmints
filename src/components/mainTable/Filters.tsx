@@ -1,50 +1,31 @@
 import { RootState } from "@/redux/store";
 import { Checkbox, RangeSlider } from "flowbite-react";
-import { useEffect } from "react";
 import { useSelector } from "react-redux";
+import useMintData from "@/hooks/useMintData";
 
 interface FiltersProps {
-  minReviews: number;
-  minRating: number;
-  onlyFriends: boolean;
-  showCashu: boolean;
-  showFedimint: boolean;
-  units: string[];
   showFilters: boolean;
-  setMinReviews: (minReviews: number) => void;
-  setMinRating: (minRating: number) => void;
-  setOnlyFriends: (onlyFriends: boolean) => void;
-  setShowCashu: (showCashu: boolean) => void;
-  setShowFedimint: (showFedi: boolean) => void;
-  handleUnitChange: (units: string) => void;
   setShowFilters: (showFilters: boolean) => void;
-  handleShowTypeChange: (show: "cashu" | "fedimint") => void;
 }
 
-const MintFilters = ({
-  minReviews,
-  minRating,
-  onlyFriends,
-  showCashu,
-  showFedimint,
-  units,
-  showFilters,
-  setMinReviews,
-  setMinRating,
-  setOnlyFriends,
-  setShowCashu,
-  setShowFedimint,
-  handleUnitChange,
-  setShowFilters,
-  handleShowTypeChange,
-}: FiltersProps) => {
+const MintFilters = ({ showFilters, setShowFilters }: FiltersProps) => {
   const loggedIn = useSelector((state: RootState) => state.user.pubkey !== "");
+  const { filters, updateFilters } = useMintData();
 
-  useEffect(() => {
-    if (!loggedIn) {
-      setOnlyFriends(false);
+  const handleShowTypeChange = (show: "cashu" | "fedimint") => {
+    if (show === "cashu") {
+      updateFilters({ showCashu: !filters.showCashu });
+    } else {
+      updateFilters({ showFedimint: !filters.showFedimint });
     }
-  }, [loggedIn]);
+  };
+
+  const handleUnitChange = (unit: string) => {
+    const newUnits = filters.units.includes(unit)
+      ? filters.units.filter((u) => u !== unit)
+      : [...filters.units, unit];
+    updateFilters({ units: newUnits });
+  };
 
   return (
     <>
@@ -64,14 +45,16 @@ const MintFilters = ({
             </div>
             <div className="flex">
               <RangeSlider
-                value={minReviews}
-                onChange={(e) => setMinReviews(Number(e.target.value))}
+                value={filters.minReviews}
+                onChange={(e) =>
+                  updateFilters({ minReviews: Number(e.target.value) })
+                }
                 id="num-reviews-slider"
                 min={0}
                 max={10}
                 sizing="sm"
               />
-              <span className="ml-1 mt-0.5">{minReviews} & up</span>
+              <span className="ml-1 mt-0.5">{filters.minReviews} & up</span>
             </div>
           </div>
           <div className="mb-5 ml-3 md:mr-5">
@@ -81,14 +64,16 @@ const MintFilters = ({
             <div className="flex">
               <RangeSlider
                 className="custom-range-thumb"
-                value={minRating}
-                onChange={(e) => setMinRating(Number(e.target.value))}
+                value={filters.minRating}
+                onChange={(e) =>
+                  updateFilters({ minRating: Number(e.target.value) })
+                }
                 id="avg-rating-slider"
                 min={0}
                 max={5}
                 sizing="sm"
               />
-              <span className="ml-1 mt-0.5">{minRating} & up</span>
+              <span className="ml-1 mt-0.5">{filters.minRating} & up</span>
             </div>
           </div>
           <div className="mb-5 ml-3 md:mr-5">
@@ -98,8 +83,10 @@ const MintFilters = ({
             <div>
               <Checkbox
                 id="only-friends-checkbox"
-                checked={onlyFriends}
-                onChange={(e) => setOnlyFriends(e.target.checked)}
+                checked={filters.onlyFriends}
+                onChange={(e) =>
+                  updateFilters({ onlyFriends: e.target.checked })
+                }
                 className="mr-2"
                 disabled={!loggedIn}
               />
@@ -113,8 +100,8 @@ const MintFilters = ({
             <div>
               <Checkbox
                 id="mint-type-cashu"
-                checked={showCashu}
-                onChange={(e) => handleShowTypeChange("cashu")}
+                checked={filters.showCashu}
+                onChange={() => handleShowTypeChange("cashu")}
                 className="mr-2"
               />
               <label htmlFor="mint-type-cashu">Cashu</label>
@@ -122,8 +109,8 @@ const MintFilters = ({
             <div>
               <Checkbox
                 id="mint-type-fedi"
-                checked={showFedimint}
-                onChange={(e) => handleShowTypeChange("fedimint")}
+                checked={filters.showFedimint}
+                onChange={() => handleShowTypeChange("fedimint")}
                 className="mr-2"
               />
               <label htmlFor="mint-type-fedi">Fedimint</label>
@@ -135,7 +122,7 @@ const MintFilters = ({
               <div>
                 <Checkbox
                   id="unit-sat"
-                  checked={units.includes("sat")}
+                  checked={filters.units.includes("sat")}
                   onChange={() => handleUnitChange("sat")}
                   className="mr-2"
                 />
@@ -144,7 +131,7 @@ const MintFilters = ({
               <div>
                 <Checkbox
                   id="unit-usd"
-                  checked={units.includes("usd")}
+                  checked={filters.units.includes("usd")}
                   onChange={() => handleUnitChange("usd")}
                   className="mr-2"
                 />
