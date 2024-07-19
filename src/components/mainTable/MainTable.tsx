@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import TableRowEndorsement from "./ReviewsRowItem";
 import useMintData from "../../hooks/useMintData";
 import { Pagination, Table, Tabs, TabsRef } from "flowbite-react";
@@ -73,6 +73,21 @@ const MintTable = () => {
     );
   };
 
+  const sortedMintInfos = useMemo(() => {
+    return mintInfos.sort((a, b) => {
+      const aAvgRating =
+        a.reviewsWithRating * (a.totalRatings / a.reviewsWithRating / 5) || 0;
+      const bAvgRating =
+        b.reviewsWithRating * (b.totalRatings / b.reviewsWithRating / 5) || 0;
+      if (!ratingSort) return 0;
+      if (ratingSort === "asc") {
+        return aAvgRating - bAvgRating;
+      } else {
+        return bAvgRating - aAvgRating;
+      }
+    });
+  }, [mintInfos, ratingSort]);
+
   const filterProps = {
     showFilters,
     setShowFilters,
@@ -111,25 +126,11 @@ const MintTable = () => {
                 </Table.HeadCell>
               </Table.Head>
               <Table.Body>
-                {mintInfos
+                {sortedMintInfos
                   .slice(
                     mintsPage * maxPerPage - maxPerPage,
                     mintsPage * maxPerPage
                   )
-                  .sort((a, b) => {
-                    const aRating =
-                      a.reviewsWithRating *
-                        (a.totalRatings / a.reviewsWithRating / 5) || 0;
-                    const bRating =
-                      b.reviewsWithRating *
-                        (b.totalRatings / b.reviewsWithRating / 5) || 0;
-                    if (!ratingSort) return 0;
-                    if (ratingSort === "asc") {
-                      return aRating - bRating;
-                    } else {
-                      return bRating - aRating;
-                    }
-                  })
                   .map((mint, idx) => (
                     <MintsRowItem mint={mint} key={idx} />
                   ))}
