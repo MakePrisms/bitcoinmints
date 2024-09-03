@@ -244,6 +244,7 @@ const ReviewModalBody = ({
 interface ListReviewModalProps {
   show: boolean;
   onClose: () => void;
+  mintType: Nip87MintTypes;
   mintUrl: string;
   setMintUrl: (url: string) => void;
   mintPubkey: string;
@@ -262,6 +263,7 @@ interface ListReviewModalProps {
 const ListReviewModal = ({
   show,
   onClose,
+  mintType,
   mintUrl,
   setMintUrl,
   mintPubkey,
@@ -284,60 +286,53 @@ const ListReviewModal = ({
         <h3 className="text-2xl font-medium">{title}</h3>
       </Modal.Header>
       <Modal.Body>
-        <Tabs style="underline" className="mt-1">
-          <Tabs.Item title="Cashu">
-            <div className="space-y-6">
-              {type === "review" ? (
-                <ReviewModalBody
-                  mintUrl={mintUrl}
-                  setMintUrl={setMintUrl}
-                  rating={rating}
-                  setRating={setRating}
-                  review={review}
-                  setReview={setReview}
-                  mintType={Nip87MintTypes.Cashu}
-                />
-              ) : (
-                <CashuListingModalBody
-                  mintUrl={mintUrl}
-                  setMintUrl={setMintUrl}
-                />
-              )}
-            </div>
-          </Tabs.Item>
-          <Tabs.Item
-            title="Fedimint"
-            active={inviteCode !== undefined && inviteCode.length > 0}
-          >
-            <div className="space-y-6">
-              {type === "review" ? (
-                <ReviewModalBody
-                  rating={rating}
-                  setRating={setRating}
-                  review={review}
-                  setReview={setReview}
-                  mintType={Nip87MintTypes.Fedimint}
-                  mintPubkey={mintPubkey}
-                  setMintPubkey={setMintPubkey}
-                  inviteCode={inviteCode}
-                  setInviteCode={setInviteCode}
-                />
-              ) : (
-                <FedimintListingModalBody
-                  mintPubkey={mintPubkey}
-                  setMintPubkey={setMintPubkey}
-                  inviteCode={inviteCode}
-                  setInviteCode={setInviteCode}
-                />
-              )}
-            </div>
-          </Tabs.Item>
-        </Tabs>
-        <div className="w-full">
+        <div className="space-y-6">
+          {mintType === Nip87MintTypes.Cashu ? (
+            type === "review" ? (
+              <ReviewModalBody
+                mintUrl={mintUrl}
+                setMintUrl={setMintUrl}
+                rating={rating}
+                setRating={setRating}
+                review={review}
+                setReview={setReview}
+                mintType={mintType}
+              />
+            ) : (
+              <CashuListingModalBody
+                mintUrl={mintUrl}
+                setMintUrl={setMintUrl}
+              />
+            )
+          ) : // Fedimint
+          type === "review" ? (
+            <ReviewModalBody
+              rating={rating}
+              setRating={setRating}
+              review={review}
+              setReview={setReview}
+              mintType={mintType}
+              mintPubkey={mintPubkey}
+              setMintPubkey={setMintPubkey}
+              inviteCode={inviteCode}
+              setInviteCode={setInviteCode}
+            />
+          ) : (
+            <FedimintListingModalBody
+              mintPubkey={mintPubkey}
+              setMintPubkey={setMintPubkey}
+              inviteCode={inviteCode}
+              setInviteCode={setInviteCode}
+            />
+          )}
+        </div>
+        <div className="w-full mt-6">
           <Button
             isProcessing={isProcessing}
             onClick={handleSubmit}
-            disabled={!inviteCode && !mintUrl}
+            disabled={
+              mintType === Nip87MintTypes.Cashu ? !mintUrl : !mintPubkey
+            }
           >
             {submitText}
           </Button>
