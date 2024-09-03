@@ -139,7 +139,7 @@ interface ReviewModalBodyProps {
   setRating?: (rating: number) => void;
   review?: string;
   setReview?: (review: string) => void;
-  mintType: Nip87MintTypes;
+  mintType?: Nip87MintTypes;
   mintPubkey?: string;
   setMintPubkey?: (pubkey: string) => void;
   inviteCode?: string;
@@ -244,7 +244,7 @@ const ReviewModalBody = ({
 interface ListReviewModalProps {
   show: boolean;
   onClose: () => void;
-  mintType: Nip87MintTypes;
+  mintType?: Nip87MintTypes;
   mintUrl: string;
   setMintUrl: (url: string) => void;
   mintPubkey: string;
