@@ -340,7 +340,11 @@ const ListReviewModal = ({
             isProcessing={isProcessing}
             onClick={handleSubmit}
             disabled={
-              mintType === Nip87MintTypes.Cashu ? !mintUrl : !mintPubkey
+              type === "review"
+                ? mintType === Nip87MintTypes.Cashu
+                  ? !mintUrl
+                  : !mintPubkey
+                : false
             }
           >
             {submitText}
