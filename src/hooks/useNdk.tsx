@@ -39,7 +39,7 @@ const NDKContext = createContext<NDKContextProps>({
 });
 
 const defaultRelays = [
-  "wss://nostr.mutinywallet.com/",
+  "wss://relay.cashumints.space",
   "wss://relay.damus.io",
   "wss://relay.snort.social",
   "wss://relay.primal.net",
