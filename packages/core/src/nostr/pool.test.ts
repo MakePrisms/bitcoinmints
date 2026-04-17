@@ -31,16 +31,22 @@ vi.mock("nostr-tools/pool", () => {
 import { createPool, SEED_RELAYS } from "./pool";
 
 describe("SEED_RELAYS", () => {
-  it("exports exactly the five-relay default seed pool from the spec", () => {
+  it("exports exactly the seven-relay default seed pool from the spec", () => {
     // Top 3 are the ecosystem-consensus NIP-87 implementor defaults
     // (damus 6/6, nos.lol 5/6, primal 4/6 across 6 surveyed hardcoders).
-    // Last 2 are cashu-branded relays — thin on event count but part of the
-    // cashu community's curated NIP-87 surface.
+    // Next 3 are audited secondary relays with real k38172 event counts
+    // (nostr.mom 8, relay.nostr.wirednet.jp 4, relay.nostrplebs.com 2)
+    // — added to widen the Cashu catch past the power-law knee. Last is
+    // relay.cashumints.space (cashu-branded, thin on events but part of
+    // the community's curated NIP-87 surface). relay.8333.space was
+    // dropped per audit: defunct / handshake timeout.
     expect(SEED_RELAYS).toEqual([
       "wss://nos.lol",
       "wss://relay.damus.io",
       "wss://relay.primal.net",
-      "wss://relay.8333.space",
+      "wss://nostr.mom",
+      "wss://relay.nostr.wirednet.jp",
+      "wss://relay.nostrplebs.com",
       "wss://relay.cashumints.space",
     ]);
   });
