@@ -3,18 +3,24 @@ import type { Filter } from "nostr-tools/filter";
 import { SimplePool } from "nostr-tools/pool";
 
 /**
- * Seed relay pool. Two of these (nos.lol + relay.damus.io) cover 98.4% of
- * all historical NIP-87 events per the empirical relay survey at
+ * Seed relay pool. The first three (nos.lol, relay.damus.io, relay.primal.net)
+ * are the ecosystem-consensus top 3 from an implementor-default survey across
+ * cashu.me, bitpoints.me, cashumints.space site, cashu-mint-page, and the
+ * current bitcoinmints main. Damus 6/6, nos.lol 5/6, primal 4/6. Empirically,
+ * nos.lol + damus alone carry 98.4% of all historical NIP-87 events per
  * /srv/forge/projects/bitcoinmints/audit/relay-strategy-v1.md.
  *
- * relay.primal.net is included for:
- * - authorless kind-10002 lookups
- * - real-time live events (carries live traffic even when NIP-87 backlog is thin)
+ * relay.8333.space + relay.cashumints.space are cashu-branded relays included
+ * for ecosystem citizenship — thin on event count but part of the cashu
+ * community's curated NIP-87 surface (8333 is cashu.me's extra default;
+ * cashumints.space appears in 2/6 implementor defaults).
  */
 export const SEED_RELAYS: readonly string[] = [
   "wss://nos.lol",
   "wss://relay.damus.io",
   "wss://relay.primal.net",
+  "wss://relay.8333.space",
+  "wss://relay.cashumints.space",
 ];
 
 export type PoolConfig = {

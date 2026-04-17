@@ -24,11 +24,17 @@ vi.mock("nostr-tools/pool", () => {
 import { createPool, SEED_RELAYS } from "./pool";
 
 describe("SEED_RELAYS", () => {
-  it("exports exactly the three-relay default seed pool from the spec", () => {
+  it("exports exactly the five-relay default seed pool from the spec", () => {
+    // Top 3 are the ecosystem-consensus NIP-87 implementor defaults
+    // (damus 6/6, nos.lol 5/6, primal 4/6 across 6 surveyed hardcoders).
+    // Last 2 are cashu-branded relays — thin on event count but part of the
+    // cashu community's curated NIP-87 surface.
     expect(SEED_RELAYS).toEqual([
       "wss://nos.lol",
       "wss://relay.damus.io",
       "wss://relay.primal.net",
+      "wss://relay.8333.space",
+      "wss://relay.cashumints.space",
     ]);
   });
 });
