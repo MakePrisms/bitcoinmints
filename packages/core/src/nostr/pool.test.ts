@@ -139,6 +139,48 @@ describe("createPool", () => {
     expect(received[0]?.relay).toBe("wss://a.test");
   });
 
+  it("drops events delivered after handle.close() (post-close gating)", () => {
+    // The inner closer awaits allOpened internally before tearing down
+    // the websocket subscription, so events can race past handle.close().
+    // Wrapper must gate at the boundary so callers see clean shutdown.
+    let capturedOnevent: ((e: unknown) => void) | undefined;
+    subscribeManyMock.mockImplementation(
+      (_relays: string[], _filter: unknown, params: { onevent: (e: unknown) => void }) => {
+        capturedOnevent = params.onevent;
+        return { close: () => {} };
+      },
+    );
+
+    const received: string[] = [];
+    const pool = createPool({ relays: ["wss://a.test"] });
+    const handle = pool.subscribe({
+      filters: [{ kinds: [38000] }],
+      onEvent: (event) => received.push(event.id),
+    });
+
+    const evt = (id: string) => ({
+      id,
+      pubkey: "pk",
+      created_at: 1,
+      kind: 38000,
+      tags: [],
+      content: "",
+      sig: "",
+    });
+
+    seenOnMock.set("before", new Set([{ url: "wss://a.test" }]));
+    capturedOnevent?.(evt("before"));
+    expect(received).toEqual(["before"]);
+
+    handle.close();
+
+    // Late delivery from the still-tearing-down subscription. Should be
+    // silently dropped.
+    seenOnMock.set("after", new Set([{ url: "wss://a.test" }]));
+    capturedOnevent?.(evt("after"));
+    expect(received).toEqual(["before"]);
+  });
+
   it("fires onEose once with the '*' placeholder (subscribeMany aggregates EOSE)", () => {
     // subscribeMany emits a single oneose after all relays EOSE without
     // surfacing which relay EOSE'd. Our wrapper documents this by passing
