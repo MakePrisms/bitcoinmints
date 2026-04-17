@@ -57,6 +57,11 @@ export type Pool = {
  */
 export function createPool(config: PoolConfig): Pool {
   const pool = new SimplePool();
+  // nostr-tools 2.23.3 ships with trackRelays defaulting to false, which
+  // means pool.seenOn never gets populated and our event-routing falls back
+  // to relays[0] for every event. Flip it on so seenOn actually reflects
+  // which relay delivered each event.
+  pool.trackRelays = true;
   const relays = [...config.relays];
 
   return {

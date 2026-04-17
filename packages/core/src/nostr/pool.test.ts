@@ -5,17 +5,24 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const subscribeManyMock = vi.fn();
 const closeMock = vi.fn();
 const seenOnMock = new Map<string, Set<{ url: string }>>();
+const constructedPools: Array<{ trackRelays: boolean }> = [];
 
 vi.mock("nostr-tools/pool", () => {
   return {
     SimplePool: class {
+      // Mirror nostr-tools 2.23.3 default: trackRelays starts false and
+      // must be flipped on by the caller for seenOn to populate.
+      trackRelays = false;
+      seenOn = seenOnMock;
+      constructor() {
+        constructedPools.push(this);
+      }
       subscribeMany(...args: unknown[]) {
         return subscribeManyMock(...args);
       }
       close(...args: unknown[]) {
         return closeMock(...args);
       }
-      seenOn = seenOnMock;
     },
   };
 });
@@ -44,6 +51,17 @@ describe("createPool", () => {
     subscribeManyMock.mockReset();
     closeMock.mockReset();
     seenOnMock.clear();
+    constructedPools.length = 0;
+  });
+
+  it("flips trackRelays=true on the underlying SimplePool so seenOn populates", () => {
+    // nostr-tools 2.23.3 defaults trackRelays to false, which silently
+    // disables seenOn. Without this flip every event would fall back to
+    // relays[0] and be misattributed. Regression guard for the bug found
+    // in PR #28 review.
+    createPool({ relays: [...SEED_RELAYS] });
+    expect(constructedPools).toHaveLength(1);
+    expect(constructedPools[0]?.trackRelays).toBe(true);
   });
 
   it("returns a pool with subscribe() and close()", () => {
