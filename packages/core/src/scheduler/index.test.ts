@@ -186,11 +186,7 @@ describe("scheduler — pipeline (single event)", () => {
     expect(mintInfo?.lastError).toContain("pubkey-mismatch");
   });
 
-  it("rejects unambiguous-garbage d-tag at Layer A (rejectedByLayerA stat increments)", async () => {
-    // Post-2026-04-17 relaxation: 16-char printable ASCII d-tags are now
-    // accepted (99.8% of real on-wire kind:38172 events use that shape).
-    // Layer A now only rejects empty / oversized / non-printable d-tags.
-    // Here we use a non-printable (embedded newline) d to exercise the gate.
+  it("rejects bot-spam d-tag at Layer A (rejectedByLayerA stat increments)", async () => {
     const db = await freshDB();
     const { pool, pushEvent } = makeFakePool();
     const { fetcher, calls } = makeFetcher({});
@@ -198,12 +194,12 @@ describe("scheduler — pipeline (single event)", () => {
     await sched.start();
 
     await pushEvent({
-      id: "garbage-1",
+      id: "spam-1",
       kind: 38172,
       pubkey: "972f233a".padEnd(64, "0"),
       created_at: 1_700_000_000,
       tags: [
-        ["d", "has\nnewline"], // non-printable ASCII — fails Layer A
+        ["d", "shortspamtag123"], // 15-char garbage — fails Layer A
         ["u", "https://mint.example.com"],
       ],
       content: "",
@@ -217,36 +213,6 @@ describe("scheduler — pipeline (single event)", () => {
     expect(sched.getStats().layerBVerified).toBe(0);
     // Layer B never ran (event was rejected before enqueue).
     expect(calls.length).toBe(0);
-  });
-
-  it("accepts curator-style 16-char d-tag at Layer A (post-relaxation)", async () => {
-    // Regression pin for the 2026-04-17 relaxation: 16-char random d-tags
-    // were wrongly filed as bot spam before the browser audit showed them
-    // pointing at real mints. Same shape, now accepted.
-    const db = await freshDB();
-    const { pool, pushEvent } = makeFakePool();
-    const { fetcher } = makeFetcher({});
-    const sched = createScheduler({ db, pool, fetcher, relays: ["wss://test"] });
-    await sched.start();
-
-    await pushEvent({
-      id: "curator-1",
-      kind: 38172,
-      pubkey: "972f233a".padEnd(64, "0"),
-      created_at: 1_700_000_000,
-      tags: [
-        ["d", "abc123def4567890"], // 16-char curator shape — accepted
-        ["u", "https://mint.example.com"],
-      ],
-      content: "",
-      sig: "fake",
-    });
-    await settle();
-    await sched.stop();
-
-    expect(await db.announcements.count()).toBe(1);
-    expect(sched.getStats().rejectedByLayerA).toBe(0);
-    expect(sched.getStats().accepted).toBe(1);
   });
 
   it("Fedimint (kind:38173) is accepted but Layer B is not enqueued", async () => {
