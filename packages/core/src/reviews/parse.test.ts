@@ -303,9 +303,7 @@ describe("parseReview — malformed rating tag forms", () => {
       ["rating", null as unknown as string, "5"],
     ];
     for (const tag of cases) {
-      const row = parseReview(
-        makeEvent({ tags: [["d", D_VALID], tag as string[]] }),
-      );
+      const row = parseReview(makeEvent({ tags: [["d", D_VALID], tag as string[]] }));
       expect(row).not.toBeNull();
       expect(row?.rating).toBeNull();
     }
