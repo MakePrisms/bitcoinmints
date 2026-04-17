@@ -223,13 +223,18 @@ describe("scheduler — pipeline (single event)", () => {
     await sched.start();
 
     const fedPubkey = "fedopk".padEnd(64, "0");
+    // Use a realistic 64-char hex federation id — every real federation
+    // observed in the audit corpus (see `fedimint-observer.md` and
+    // `reviews/corpus.test.ts`) is lowercase 64-char hex. Short/junk
+    // d-tags get rejected by Layer A even when k=38173.
+    const fedId = "718e421be177486639330d198e870b7345ebd07b2866b5fd3797d73e4bc4c9af";
     await pushEvent({
       id: "fed-1",
       kind: 38173,
       pubkey: fedPubkey,
       created_at: 1_700_000_000,
       tags: [
-        ["d", "fed11abc"],
+        ["d", fedId],
         ["u", "fed11abc..."],
       ],
       content: "",

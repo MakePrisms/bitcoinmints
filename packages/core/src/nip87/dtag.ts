@@ -29,9 +29,30 @@
 export const D_TAG_REGEX = /^([0-9a-f]{64}|0[23][0-9a-f]{64})$/;
 
 /**
+ * Fedimint federation-id d-tag shape. Every real Fedimint federation ID
+ * observed in the audit corpus (see `audit/fedimint-observer.md` and
+ * `packages/core/src/reviews/corpus.test.ts`) is lowercase 64-char hex —
+ * the blake3 hash of the federation's consensus public key, serialized as
+ * 32 bytes of hex. A short/junk d-tag with `k=38173` slapped on is bot
+ * spam, not a federation, and must be rejected by the same Layer A
+ * firewall that catches 16-char Cashu bot spam.
+ *
+ * Keeping this sibling to `D_TAG_REGEX` so both Layer A shape gates live
+ * in one file — a reviewer touching one will see the other immediately.
+ */
+export const FEDIMINT_D_TAG_REGEX = /^[0-9a-f]{64}$/;
+
+/**
  * True iff `d` is either a 64-char x-only secp256k1 pubkey or a 66-char
  * compressed secp256k1 pubkey, both lowercase hex.
  */
 export function isValidCashuDTag(d: string): boolean {
   return D_TAG_REGEX.test(d);
+}
+
+/**
+ * True iff `d` is a lowercase 64-char hex Fedimint federation ID.
+ */
+export function isValidFedimintDTag(d: string): boolean {
+  return FEDIMINT_D_TAG_REGEX.test(d);
 }
