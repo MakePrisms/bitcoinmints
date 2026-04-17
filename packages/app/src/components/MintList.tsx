@@ -35,6 +35,12 @@ export function MintList({ db }: Props): JSX.Element {
   // lag behind `announcements` — that's intentional. PR #7 will decide
   // whether to render un-reviewed announcements as a tail section; for
   // the X-ray we follow the ranked-aggregate-as-truth posture.
+  //
+  // Render-filter note: we drop non-Cashu announcements (kind !== 38172)
+  // below so the X-ray matches spec v1 (Cashu-only). The parse layer still
+  // stores k=38173 (Fedimint) rows and `rankMints` still ranks them — PR
+  // #7+ may surface those elsewhere. Keep this filter in the UI; do NOT
+  // push it into `rankMints` (don't mutate core for a UI-only concern).
   const rows = useLiveQuery<JoinedRow[], JoinedRow[]>(
     async () => {
       const aggregates = await rankMints(db, 50);
@@ -57,10 +63,15 @@ export function MintList({ db }: Props): JSX.Element {
     [],
   );
 
+  // Render-only Cashu filter (see note above). Orphan aggregates (no
+  // announcement — shouldn't happen in practice) are also dropped
+  // defensively so we never flash a "(no announcement)" row.
+  const visible = rows.filter((r) => r.announcement !== undefined && r.announcement.kind === 38172);
+
   // Empty state per spec: stats block still renders (that's in App.tsx),
   // the `mints` header always renders, and if there's nothing to show the
   // single line `no mints yet` sits below it.
-  if (rows.length === 0) {
+  if (visible.length === 0) {
     return (
       <>
         <div>mints</div>
@@ -72,13 +83,13 @@ export function MintList({ db }: Props): JSX.Element {
   return (
     <>
       <div>mints</div>
-      {rows.map((row, i) => (
+      {visible.map((row, i) => (
         <MintRow
           key={row.aggregate.d}
           aggregate={row.aggregate}
           announcement={row.announcement}
           info={row.info}
-          isLast={i === rows.length - 1}
+          isLast={i === visible.length - 1}
         />
       ))}
     </>
