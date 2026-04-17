@@ -189,3 +189,72 @@ describe("integration: corpus replay → parse → cache", () => {
     expect(result).toBe("inserted");
   });
 });
+
+describe("integration: CAS convergence under simulated multi-relay race", () => {
+  it("multi-relay echo of the same event id: 1 row, 1 inserted + 2 rejected-stale, deterministic", async () => {
+    // Three relays publish the same canonical event. Same id, same key,
+    // same createdAt — the equal-eventId loses the tiebreak (next > prev is
+    // false), so re-broadcasts always end as 'rejected-stale'. No churn.
+    const legacy = f.cashu38172Legacy[0];
+    expect(legacy).toBeDefined();
+    if (!legacy) return;
+    const parsed = parseMintAnnouncement(legacy);
+    expect(parsed).not.toBeNull();
+    if (!parsed) return;
+    const row = toAnnouncementRow(parsed);
+
+    const db = await freshDB();
+    const results = await Promise.all([
+      upsertAnnouncement(db, row),
+      upsertAnnouncement(db, row),
+      upsertAnnouncement(db, row),
+    ]);
+
+    expect(await db.announcements.count()).toBe(1);
+    const inserted = results.filter((r) => r === "inserted");
+    const stale = results.filter((r) => r === "rejected-stale");
+    expect(inserted.length).toBe(1);
+    expect(stale.length).toBe(2);
+  });
+
+  it("tiebreak under race: 3 events with same [pubkey,kind,d,createdAt] but different eventIds — highest eventId always wins, 10 shuffled trials", async () => {
+    // Real-world: same logical replaceable event published by the same
+    // signer at the same second but with different ids (e.g. retried after
+    // a sig collision, or re-emitted by a buggy client). The lex-highest
+    // eventId must win deterministically every time, regardless of arrival
+    // order.
+    const legacy = f.cashu38172Legacy[0];
+    expect(legacy).toBeDefined();
+    if (!legacy) return;
+    const parsed = parseMintAnnouncement(legacy);
+    expect(parsed).not.toBeNull();
+    if (!parsed) return;
+    const baseRow = toAnnouncementRow(parsed);
+    const eidLow = `${"0".repeat(60)}1111`;
+    const eidMid = `${"0".repeat(60)}5555`;
+    const eidHigh = `${"0".repeat(60)}ffff`;
+
+    for (let trial = 0; trial < 10; trial++) {
+      const db = await freshDB();
+      const variants: AnnouncementRow[] = [
+        { ...baseRow, eventId: eidLow, content: "lo" },
+        { ...baseRow, eventId: eidMid, content: "mid" },
+        { ...baseRow, eventId: eidHigh, content: "hi" },
+      ];
+      // Fisher-Yates shuffle — different arrival order each trial.
+      for (let i = variants.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        const tmp = variants[i] as AnnouncementRow;
+        const swap = variants[j] as AnnouncementRow;
+        variants[i] = swap;
+        variants[j] = tmp;
+      }
+      await Promise.all(variants.map((v) => upsertAnnouncement(db, v)));
+
+      expect(await db.announcements.count()).toBe(1);
+      const fetched = await db.announcements.get([baseRow.pubkey, baseRow.kind, baseRow.d]);
+      expect(fetched?.eventId).toBe(eidHigh);
+      expect(fetched?.content).toBe("hi");
+    }
+  });
+});
