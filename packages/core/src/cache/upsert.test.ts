@@ -266,6 +266,36 @@ describe("upsertAnnouncement", () => {
     const fetched = await db.announcements.get([original.pubkey, original.kind, D_XONLY]);
     expect(fetched?.content).toBe("update");
   });
+
+  it("preserves verifiedBySignerBinding across a CAS replace (Layer B isn't clobbered by a newer parser-emitted row)", async () => {
+    const db = await freshDB();
+    const original = makeAnnouncement({ d: D_XONLY, createdAt: 1000, content: "original" });
+    expect(await upsertAnnouncement(db, original)).toBe("inserted");
+
+    // Simulate PR #4's Layer B verifier flipping the bit out-of-band (direct
+    // db write — not via upsert).
+    await db.announcements.update([original.pubkey, original.kind, D_XONLY], {
+      verifiedBySignerBinding: true,
+    });
+    const afterVerify = await db.announcements.get([original.pubkey, original.kind, D_XONLY]);
+    expect(afterVerify?.verifiedBySignerBinding).toBe(true);
+
+    // Newer event arrives — parser doesn't know about Layer B, so it carries `null`.
+    const update = makeAnnouncement({
+      d: D_XONLY,
+      createdAt: 2000,
+      content: "update",
+      verifiedBySignerBinding: null,
+    });
+    expect(await upsertAnnouncement(db, update)).toBe("replaced");
+
+    const fetched = await db.announcements.get([original.pubkey, original.kind, D_XONLY]);
+    // Newer fields land...
+    expect(fetched?.content).toBe("update");
+    expect(fetched?.createdAt).toBe(2000);
+    // ...but Layer B verification is preserved.
+    expect(fetched?.verifiedBySignerBinding).toBe(true);
+  });
 });
 
 describe("upsertReview", () => {

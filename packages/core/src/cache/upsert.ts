@@ -74,7 +74,14 @@ export async function upsertAnnouncement(
       return "inserted";
     }
     if (nextWins(prev, row)) {
-      await db.announcements.put(row);
+      // Preserve Layer B verification across CAS replace. The parser doesn't
+      // know about /v1/info reconciliation, so an incoming row always carries
+      // verifiedBySignerBinding: null. Without this merge, a newer event would
+      // clobber a prior `true`/`false` set by PR #4's verifier.
+      await db.announcements.put({
+        ...row,
+        verifiedBySignerBinding: prev.verifiedBySignerBinding ?? row.verifiedBySignerBinding,
+      });
       return "replaced";
     }
     return "rejected-stale";
