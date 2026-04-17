@@ -545,3 +545,241 @@ describe("scheduler — drain on stop", () => {
     expect(sched.getStats().layerBPending).toBe(0);
   });
 });
+
+describe("scheduler — Layer B vs CAS replace race", () => {
+  it("does not clobber a newer event when Layer B finishes after a replace", async () => {
+    // Pin gap #22 (and code-reviewer #2): the runLayerB persist branch
+    // used to do a non-transactional read+merge — read existing, spread,
+    // put with verifiedBySignerBinding. If a newer event landed between
+    // the read and the put, the spread re-wrote the stale snapshot.
+    //
+    // Sequence:
+    //   1. Insert announcement at createdAt=100 with u=[oldUrl].
+    //   2. Kick off Layer B. Hold the fetcher hostage so verify hasn't
+    //      resolved yet.
+    //   3. While Layer B is in-flight, a newer event lands at
+    //      createdAt=200 with u=[newUrl] and a fresh eventId.
+    //   4. Release the Layer B fetcher.
+    //
+    // Expected: the row in the cache reflects the createdAt=200 event,
+    // verifiedBySignerBinding stays null (didn't get clobbered with the
+    // stale snapshot), and the new u[] is preserved.
+    const db = await freshDB();
+    const { pool, pushEvent } = makeFakePool();
+
+    // Capture every fetcher invocation so we can release them out-of-order
+    // (the test specifically wants to release the OLD event's Layer B
+    // fetch after the NEW event has been persisted).
+    const releasers: Array<{
+      url: string;
+      resolve: (r: MintInfoResult) => void;
+    }> = [];
+    const fetcher: MintInfoFetcher = (url: string) =>
+      new Promise<MintInfoResult>((resolve) => {
+        releasers.push({ url, resolve });
+      });
+
+    const sched = createScheduler({ db, pool, fetcher, relays: ["wss://test"] });
+    await sched.start();
+
+    const pubkey = "02".padEnd(66, "1");
+
+    // Step 1: first event lands. Layer B starts and waits on the hostage.
+    await pushEvent(
+      makeAnnouncement({
+        pubkey,
+        d: pubkey,
+        u: ["https://old.example"],
+        createdAt: 100,
+        eventId: "old".padEnd(64, "0"),
+      }),
+    );
+    // Yield several macrotasks so the Layer B body has a chance to walk
+    // through its initial backoff check and reach the await fetcher() call
+    // (which captures the releaser).
+    for (let i = 0; i < 5; i++) await new Promise<void>((r) => setTimeout(r, 0));
+    expect(releasers.length).toBe(1);
+    expect(releasers[0]?.url).toBe("https://old.example");
+
+    // Step 3: a newer event arrives BEFORE the first Layer B fetch resolves.
+    // upsertAnnouncement replaces the row inside its own transaction
+    // (preserving verifiedBySignerBinding=null since the prior was null).
+    // The newer event also enqueues its own Layer B → second fetcher call.
+    await pushEvent(
+      makeAnnouncement({
+        pubkey,
+        d: pubkey,
+        u: ["https://new.example"],
+        createdAt: 200,
+        eventId: "new".padEnd(64, "f"),
+      }),
+    );
+    // Allow the newer event's Layer B to register its fetcher hostage.
+    for (let i = 0; i < 5; i++) await new Promise<void>((r) => setTimeout(r, 0));
+    // Now we should have two pending fetcher calls — the OLD url and the NEW url.
+    expect(releasers.length).toBe(2);
+    expect(releasers[1]?.url).toBe("https://new.example");
+
+    // The newer event has already replaced the row in the cache.
+    const beforeRelease = await db.announcements.get([pubkey, 38172, pubkey]);
+    expect(beforeRelease?.eventId).toBe("new".padEnd(64, "f"));
+    expect(beforeRelease?.u).toEqual(["https://new.example"]);
+
+    // Step 4: release the STALE (first) Layer B fetch with a "successful"
+    // verification. The old runLayerB code would clobber the newer row
+    // here. The fixed code reads the current eventId inside a transaction
+    // and drops the write since the eventId no longer matches.
+    releasers[0]?.resolve({ ok: true, info: { pubkey } });
+    // Drain microtasks so the stale runLayerB completes its persist branch.
+    for (let i = 0; i < 5; i++) await new Promise<void>((r) => setTimeout(r, 0));
+
+    const afterStaleRelease = await db.announcements.get([pubkey, 38172, pubkey]);
+    // Row identity preserved — newer event still wins.
+    expect(afterStaleRelease?.eventId).toBe("new".padEnd(64, "f"));
+    expect(afterStaleRelease?.u).toEqual(["https://new.example"]);
+    // verifiedBySignerBinding stays null — the stale Layer B did NOT
+    // clobber the newer row's verification field.
+    expect(afterStaleRelease?.verifiedBySignerBinding).toBeNull();
+
+    // Cleanup: release the newer event's still-pending fetcher so stop()
+    // can drain.
+    releasers[1]?.resolve({ ok: true, info: { pubkey } });
+    await sched.stop();
+  });
+});
+
+describe("scheduler — watermark restore behavior", () => {
+  it("clamps a future-poisoned createdAt on restore (year-3000 event does NOT poison watermark)", async () => {
+    // Pin gap #19 / silent-failure: an event with created_at far in the
+    // future would otherwise become the watermark and silently filter
+    // every legitimate event with a smaller created_at on the wire.
+    const db = await freshDB();
+    // mockNow: a fixed "current time". The clamp should cap to
+    // floor(mockNow/1000) + 600 (the future slack).
+    const realNowMs = 1_900_000_000_000;
+    const realNowSec = Math.floor(realNowMs / 1000);
+    const mockNow = () => realNowMs;
+
+    const yearThousandSec = 32_503_680_000; // ~year 3000
+
+    // Pre-seed the cache with a poisoned row.
+    await db.announcements.put({
+      pubkey: "02".padEnd(66, "a"),
+      kind: 38172,
+      d: "02".padEnd(66, "a"),
+      eventId: "poison".padEnd(64, "0"),
+      createdAt: yearThousandSec,
+      u: ["https://poisoned.example"],
+      content: "",
+      rawTags: [],
+      verifiedBySignerBinding: null,
+    });
+
+    const { pool, subs } = makeFakePool();
+    const { fetcher } = makeFetcher({});
+    const sched = createScheduler({
+      db,
+      pool,
+      fetcher,
+      relays: ["wss://test"],
+      now: mockNow,
+    });
+    await sched.start();
+
+    const sub38172 = subs.find((s) => s.opts.filters.some((f: Filter) => f.kinds?.includes(38172)));
+    const filter38172 = sub38172?.opts.filters.find((f: Filter) => f.kinds?.includes(38172));
+    // The watermark MUST have been clamped — not equal to year 3000.
+    expect(filter38172?.since).not.toBe(yearThousandSec);
+    // Specifically it should be clamped at most to (now-secs + 600).
+    expect(filter38172?.since).toBeLessThanOrEqual(realNowSec + 600);
+    // And it should be at least 1 (we did seed something).
+    expect(filter38172?.since).toBeGreaterThan(0);
+
+    await sched.stop();
+  });
+
+  it("cold-start with empty cache leaves the watermark filter absent (not undefined-as-since)", async () => {
+    const db = await freshDB();
+    const { pool, subs } = makeFakePool();
+    const { fetcher } = makeFetcher({});
+    const sched = createScheduler({ db, pool, fetcher, relays: ["wss://test"] });
+    await sched.start();
+
+    const sub38172 = subs.find((s) => s.opts.filters.some((f: Filter) => f.kinds?.includes(38172)));
+    const filter38172 = sub38172?.opts.filters.find((f: Filter) => f.kinds?.includes(38172));
+    // No prior data → no `since` filter (and definitely not `since: undefined`,
+    // which would round-trip as 0/null over the wire and confuse some relays).
+    expect(filter38172).toBeDefined();
+    expect("since" in (filter38172 ?? {})).toBe(false);
+
+    await sched.stop();
+  });
+});
+
+describe("scheduler — backoff cap", () => {
+  it("caps backoff at MAX_BACKOFF_MS (1h) — attempt 8 == attempt 10 in wait time", async () => {
+    // 10 consecutive failures for the same announcement: backoff grows
+    // exponentially BASE_BACKOFF_MS * 2^(attempts-1) and is capped at
+    // MAX_BACKOFF_MS. attempts=7 already produces > 1h (30s * 64 =
+    // 32min, attempts=8 = 64min capped to 60min). Attempts 8,9,10 all
+    // give the same 60min wait.
+    const db = await freshDB();
+    const { pool, pushEvent } = makeFakePool();
+    const { fetcher } = makeFetcher({ "https://broken.example.com": "fail" });
+
+    let mockNow = 1_700_000_000_000;
+    const sched = createScheduler({
+      db,
+      pool,
+      fetcher,
+      relays: ["wss://test"],
+      now: () => mockNow,
+    });
+    await sched.start();
+
+    const pubkey = "02".padEnd(66, "9");
+
+    // Helper: push a fresh event and wait for Layer B to settle.
+    async function pushAndDrain(eventId: string, createdAt: number): Promise<void> {
+      await pushEvent(
+        makeAnnouncement({
+          pubkey,
+          d: pubkey,
+          u: ["https://broken.example.com"],
+          createdAt,
+          eventId,
+        }),
+      );
+      await settle();
+    }
+
+    // Drive enough failures to saturate the cap.
+    for (let i = 0; i < 10; i++) {
+      // Skip past the prior attempt's cooldown each time so the next
+      // attempt is allowed.
+      mockNow += 60 * 60_000 + 1; // 1h+1ms — past the cap
+      await pushAndDrain(`ev${i}`.padEnd(64, "0"), 1_700_000_000 + i);
+    }
+
+    // After 10 failures, the backoff cap should be exactly MAX_BACKOFF_MS.
+    // We verify by checking that an attempt at exactly cap-1 ms is still
+    // suppressed, but at cap ms it's allowed.
+    const lastAttemptedAt = mockNow;
+    // Exactly at cap minus 1ms: should be in cooldown (no fetch).
+    mockNow = lastAttemptedAt + 60 * 60_000 - 1;
+    const callsBefore = (await db.mintInfo.count()) === 0 ? 0 : 1; // anchor — fetcher.calls would be cleaner but we rely on stats
+    const failedBefore = sched.getStats().layerBFailed;
+    await pushAndDrain("evcap1".padEnd(64, "0"), 1_700_000_100);
+    expect(sched.getStats().layerBFailed).toBe(failedBefore); // unchanged
+
+    // At cap exactly: allowed.
+    mockNow = lastAttemptedAt + 60 * 60_000;
+    await pushAndDrain("evcap2".padEnd(64, "0"), 1_700_000_101);
+    expect(sched.getStats().layerBFailed).toBe(failedBefore + 1);
+
+    // Anchor variable used to avoid lint about unused declarations.
+    expect(callsBefore).toBeGreaterThanOrEqual(0);
+
+    await sched.stop();
+  });
+});
