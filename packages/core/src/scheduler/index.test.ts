@@ -788,3 +788,54 @@ describe("scheduler — backoff cap", () => {
     await sched.stop();
   });
 });
+
+describe("scheduler — debug logging opt-in", () => {
+  // We assert the negative-case contract: debug unset (and debug=false,
+  // exercised via the default) produces ZERO console.log calls from the
+  // scheduler. We don't assert the `debug=true` output verbatim — that
+  // log format is a demo/X-ray aid and asserting exact strings would
+  // brittle the tests against formatting tweaks.
+  it("default (debug unset) produces no scheduler console.log across a full pipeline run", async () => {
+    const db = await freshDB();
+    const { pool, pushEvent } = makeFakePool();
+    const pubkey = "02".padEnd(66, "7");
+    const { fetcher } = makeFetcher({ "https://mint.example.com": pubkey });
+    const sched = createScheduler({ db, pool, fetcher, relays: ["wss://test"] });
+
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    try {
+      await sched.start();
+      // Exercise each kind's path so any path-level log would fire.
+      await pushEvent(makeAnnouncement({ pubkey, d: pubkey, u: ["https://mint.example.com"] }));
+      await pushEvent({
+        id: "review-debug",
+        kind: 38000,
+        pubkey: "reviewer".padEnd(64, "0"),
+        created_at: 1_700_000_000,
+        tags: [
+          ["k", "38172"],
+          ["d", pubkey],
+          ["rating", "5", "5"],
+        ],
+        content: "[5/5] fine",
+        sig: "fake",
+      });
+      await pushEvent({
+        id: "profile-debug",
+        kind: 0,
+        pubkey: "profile".padEnd(64, "0"),
+        created_at: 1_700_000_001,
+        tags: [],
+        content: "{}",
+        sig: "fake",
+      });
+      await settle();
+      await sched.stop();
+
+      // Zero calls: confirms debug-off is a pure no-op for logging cost.
+      expect(logSpy).not.toHaveBeenCalled();
+    } finally {
+      logSpy.mockRestore();
+    }
+  });
+});

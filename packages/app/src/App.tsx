@@ -35,11 +35,22 @@ import { MintList } from "./components/MintList";
 const db = new BitcoinmintsDB();
 const pool = createPool({ relays: [...SEED_RELAYS] });
 const fetcher = createMintInfoFetcher({ concurrency: 4 });
+/**
+ * Debug logging is a demo/X-ray aid, toggled via `?debug` on the URL (any
+ * presence wins; no value parsing). When enabled, the scheduler logs its
+ * filters/relays on start(), a per-event path line, and a per-Layer-B
+ * verdict line — all through `console.log`/`console.warn` with the
+ * `[scheduler]` prefix. Deliberately URL-toggled (not env-baked) so an
+ * alchemist can flip it on during a live demo without rebuilding.
+ */
+const DEBUG_SCHEDULER =
+  typeof window !== "undefined" && new URLSearchParams(window.location.search).has("debug");
 const scheduler: Scheduler = createScheduler({
   db,
   pool,
   fetcher,
   relays: SEED_RELAYS,
+  debug: DEBUG_SCHEDULER,
 });
 
 const STATS_POLL_MS = 500;
