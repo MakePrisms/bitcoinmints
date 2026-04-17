@@ -9,6 +9,7 @@
  * fake-indexeddb is loaded in vitest.setup.ts.
  */
 import type { Event as NostrEvent } from "nostr-tools/core";
+import type { Filter } from "nostr-tools/filter";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   type AnnouncementRow,
@@ -17,9 +18,12 @@ import {
   upsertAnnouncement,
   upsertReview,
 } from "./cache";
+import type { MintInfoFetcher, MintInfoResult } from "./cashu/info";
 import fixtures from "./nip87/__fixtures__/nip87-sample.json" with { type: "json" };
 import { isValidCashuDTag } from "./nip87/dtag";
 import { parseMintAnnouncement, parseRecommendation } from "./nip87/parse";
+import type { Pool, PoolHandle, SubscribeOptions } from "./nostr";
+import { createScheduler } from "./scheduler";
 
 type Fixture = {
   _meta: Record<string, unknown>;
@@ -299,5 +303,259 @@ describe("integration: Layer A enforced at cache, not parser", () => {
       expect(result).toBe("inserted");
     }
     expect(await db.announcements.count()).toBe(allValid.length);
+  });
+});
+
+// ── Scheduler integration ────────────────────────────────────────────────
+//
+// The above tests prove parse → cache. The scheduler is the production
+// orchestrator that adds Layer B and watermark restore on top — these
+// tests pin that running the corpus through `createScheduler` produces
+// the same final cache state PLUS the right verifiedBySignerBinding
+// values, the right mintInfo rows, and the right stats counters.
+//
+// We use a fake pool and a deterministic fetcher so the only randomness
+// is the corpus itself (and a Fisher-Yates shuffle in the race test, but
+// only inside the cache layer which has its own coverage above).
+
+type FakeSub = { opts: SubscribeOptions; handle: PoolHandle; closed: boolean };
+
+function makeFakePool(): {
+  pool: Pool;
+  pushEvent: (event: NostrEvent) => Promise<void>;
+} {
+  const subs: FakeSub[] = [];
+  const pool: Pool = {
+    subscribe(opts: SubscribeOptions): PoolHandle {
+      const sub: FakeSub = {
+        opts,
+        closed: false,
+        handle: {
+          close() {
+            sub.closed = true;
+          },
+        },
+      };
+      subs.push(sub);
+      return sub.handle;
+    },
+    close() {
+      for (const s of subs) s.closed = true;
+    },
+  };
+  return {
+    pool,
+    async pushEvent(event: NostrEvent) {
+      for (const sub of subs) {
+        if (sub.closed) continue;
+        const matches = sub.opts.filters.some((filter: Filter) =>
+          filter.kinds?.includes(event.kind),
+        );
+        if (matches) {
+          sub.opts.onEvent(event, "wss://test.relay");
+          // Yield once per push so the async handler can complete its DB
+          // writes before the next event arrives.
+          await new Promise<void>((r) => setTimeout(r, 0));
+        }
+      }
+    },
+  };
+}
+
+/**
+ * Drain Layer B work. Poll `layerBPending` until 0 (or timeout) — robust
+ * against the per-task transaction wrapping that adds microtask hops.
+ * The previous fixed 10-yield drain raced under slower CI runners.
+ */
+async function drainLayerB(sched?: { getStats: () => { layerBPending: number } }): Promise<void> {
+  for (let i = 0; i < 200; i++) {
+    if (sched && sched.getStats().layerBPending === 0 && i >= 5) return;
+    await new Promise<void>((r) => setTimeout(r, 0));
+  }
+}
+
+/**
+ * Build a fetcher that responds with the right pubkey for the synthetic
+ * spec-conforming mints (so Layer B verifies) and with a real-ish failure
+ * for the legacy mint (so we can assert one verified + one failed branch).
+ */
+function makeCorpusFetcher(): MintInfoFetcher {
+  // Map: url -> pubkey it should claim. Anything not in the map yields a
+  // 404 result, exercising the all-fetches-failed reason.
+  const mapping: Record<string, string> = {
+    // SpecConforming mint Alpha — pubkey matches d-tag of the announcement.
+    "https://mint.alpha.test": "02aa00000000000000000000000000000000000000000000000000000000000001",
+    // SpecConforming mint Beta — second URL is the canonical one in the
+    // announcement; primary URL also points at the right pubkey.
+    "https://mint.beta.test": "03bb00000000000000000000000000000000000000000000000000000000000002",
+    "https://mint.beta.test/v1":
+      "03bb00000000000000000000000000000000000000000000000000000000000002",
+    // Legacy Nostrodomo: pubkey deliberately mismatched so we exercise
+    // the pubkey-mismatch failure branch.
+    "https://mint.sharegap.net": "02deadbeef",
+  };
+  return async (url: string): Promise<MintInfoResult> => {
+    const pk = mapping[url];
+    if (pk === undefined) {
+      return { ok: false, error: "non-2xx (404)", status: 404 };
+    }
+    return { ok: true, info: { pubkey: pk, name: `Mint at ${url}` } };
+  };
+}
+
+/**
+ * Push every Cashu + Fedimint announcement from the corpus through the
+ * given pool, waiting for the scheduler's Layer B to drain.
+ */
+async function pushCashuCorpus(pushEvent: (e: NostrEvent) => Promise<void>): Promise<void> {
+  const allCashu: NostrEvent[] = [
+    ...f.cashu38172BotSpam,
+    ...f.cashu38172Legacy,
+    ...f.cashu38172SpecConforming,
+  ];
+  for (const e of allCashu) await pushEvent(e);
+  for (const e of f.fedimint38173) await pushEvent(e);
+  for (const e of f.recommendations38000) await pushEvent(e);
+}
+
+describe("integration: scheduler full pipeline", () => {
+  it("runs the corpus through createScheduler and converges with Layer B applied", async () => {
+    const db = await freshDB();
+    const { pool, pushEvent } = makeFakePool();
+    const fetcher = makeCorpusFetcher();
+    const sched = createScheduler({ db, pool, fetcher, relays: ["wss://test.relay"] });
+    await sched.start();
+
+    await pushCashuCorpus(pushEvent);
+    await drainLayerB(sched);
+
+    // Stats: same accept/reject as the parse → cache integration above
+    // (5 bot-spam rejected at Layer A; 1 legacy + 2 spec-conforming + 3
+    // fedimint accepted = 6 announcements; 5 reviews accepted).
+    const stats = sched.getStats();
+    // 11 announcements (5 spam + 1 legacy + 2 spec + 3 fedi) + 5 reviews = 16.
+    expect(stats.eventsReceived).toBe(16);
+    expect(stats.rejectedByLayerA).toBe(5);
+    // Accepted = 6 announcements + 5 reviews = 11.
+    expect(stats.accepted).toBe(11);
+
+    // Layer B: spec-conforming Alpha + Beta verify. Legacy Nostrodomo
+    // returns ok but with the wrong pubkey → counts as failed. Fedimint
+    // is non-cashu and doesn't enqueue Layer B at all.
+    expect(stats.layerBVerified).toBe(2);
+    expect(stats.layerBFailed).toBe(1);
+    expect(stats.layerBPending).toBe(0);
+
+    // Cache state matches the parse → cache test exactly: 6 announcements,
+    // 5 reviews. Bot-spam rejected at Layer A, never lands.
+    expect(await db.announcements.count()).toBe(6);
+    expect(await db.reviews.count()).toBe(5);
+
+    // Spot-check verifiedBySignerBinding wired through correctly.
+    const alphaPubkey = "02aa00000000000000000000000000000000000000000000000000000000000001";
+    const alpha = await db.announcements.get([alphaPubkey, 38172, alphaPubkey]);
+    expect(alpha?.verifiedBySignerBinding).toBe(true);
+
+    const betaPubkey = "03bb00000000000000000000000000000000000000000000000000000000000002";
+    const beta = await db.announcements.get([betaPubkey, 38172, betaPubkey]);
+    expect(beta?.verifiedBySignerBinding).toBe(true);
+
+    const legacyPubkey = "5fe928ae0970844f3c5253d2e85a88788486edcbd96c070334a4a2d0d0154a77";
+    const legacy = await db.announcements.get([legacyPubkey, 38172, legacyPubkey]);
+    expect(legacy?.verifiedBySignerBinding).toBe(false);
+
+    // Fedimint announcements are accepted but Layer B doesn't run, so the
+    // field stays null (not false — null distinguishes "didn't try" from
+    // "tried and failed").
+    const fedimintRow = await db.announcements.where("kind").equals(38173).first();
+    expect(fedimintRow).toBeDefined();
+    expect(fedimintRow?.verifiedBySignerBinding).toBeNull();
+
+    // mintInfo rows: 2 ok (Alpha, Beta) + 1 !ok (Legacy mismatch).
+    expect(await db.mintInfo.count()).toBe(3);
+    const alphaInfo = await db.mintInfo.get(alphaPubkey);
+    expect(alphaInfo?.ok).toBe(true);
+    expect(alphaInfo?.url).toBe("https://mint.alpha.test");
+    const legacyInfo = await db.mintInfo.get(legacyPubkey);
+    expect(legacyInfo?.ok).toBe(false);
+    expect(legacyInfo?.lastError).toContain("pubkey-mismatch");
+
+    await sched.stop();
+  });
+
+  it("idempotency: stop and re-start replays the corpus with no double-fetches and no duplicate rows", async () => {
+    // Run the corpus through scheduler 1, stop, then run the same corpus
+    // through scheduler 2 against the same DB. The CAS should reject all
+    // duplicates as 'rejected-stale' (not 'replaced' since createdAt is
+    // identical), Layer B should NOT re-fetch (the fetcher's cache is per-
+    // process, but cross-restart we rely on backoff-skip-on-replace + the
+    // 'replaced'/'rejected-stale' branch never enqueueing Layer B).
+    const db = await freshDB();
+
+    // Round 1.
+    const { pool: pool1, pushEvent: push1 } = makeFakePool();
+    const calls1: string[] = [];
+    const baseFetcher = makeCorpusFetcher();
+    const fetcher1: MintInfoFetcher = (url) => {
+      calls1.push(url);
+      return baseFetcher(url);
+    };
+    const sched1 = createScheduler({
+      db,
+      pool: pool1,
+      fetcher: fetcher1,
+      relays: ["wss://test.relay"],
+    });
+    await sched1.start();
+    await pushCashuCorpus(push1);
+    await drainLayerB(sched1);
+    await sched1.stop();
+
+    const round1Counts = {
+      announcements: await db.announcements.count(),
+      reviews: await db.reviews.count(),
+      mintInfo: await db.mintInfo.count(),
+      fetches: calls1.length,
+    };
+    expect(round1Counts.announcements).toBe(6);
+    expect(round1Counts.reviews).toBe(5);
+    expect(round1Counts.mintInfo).toBe(3);
+
+    // Round 2 — fresh scheduler against same DB. createScheduler reads
+    // the watermarks from the cache; the corpus replay uses the same
+    // events (same createdAt), so every announcement upsert lands as
+    // 'rejected-stale' (next.createdAt is NOT > prev.createdAt) which
+    // means Layer B is not re-enqueued, so calls2 stays at 0.
+    const { pool: pool2, pushEvent: push2 } = makeFakePool();
+    const calls2: string[] = [];
+    const fetcher2: MintInfoFetcher = (url) => {
+      calls2.push(url);
+      return baseFetcher(url);
+    };
+    const sched2 = createScheduler({
+      db,
+      pool: pool2,
+      fetcher: fetcher2,
+      relays: ["wss://test.relay"],
+    });
+    await sched2.start();
+    await pushCashuCorpus(push2);
+    await drainLayerB(sched2);
+    await sched2.stop();
+
+    // Same row counts — no duplicates introduced by the replay.
+    expect(await db.announcements.count()).toBe(round1Counts.announcements);
+    expect(await db.reviews.count()).toBe(round1Counts.reviews);
+    expect(await db.mintInfo.count()).toBe(round1Counts.mintInfo);
+
+    // No second-round Layer B fetches: each 'rejected-stale' upsert short-
+    // circuits the enqueue path.
+    expect(calls2.length).toBe(0);
+
+    // Verification status preserved across restart (PR #29 fix on the
+    // cache + scheduler not clobbering on replace).
+    const alphaPubkey = "02aa00000000000000000000000000000000000000000000000000000000000001";
+    const alpha = await db.announcements.get([alphaPubkey, 38172, alphaPubkey]);
+    expect(alpha?.verifiedBySignerBinding).toBe(true);
   });
 });

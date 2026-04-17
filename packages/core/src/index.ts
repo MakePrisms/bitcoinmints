@@ -1,4 +1,5 @@
 export * from "./cache";
+export * from "./cashu";
 export * from "./nip87";
 export * from "./nostr";
 

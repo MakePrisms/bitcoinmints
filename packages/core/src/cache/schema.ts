@@ -142,5 +142,14 @@ export class BitcoinmintsDB extends Dexie {
       mintInfo: "d, fetchedAt, ok",
       mintAggregate: "d, bayesianRank, updatedAt",
     });
+    // v2: add compound `[kind+createdAt]` index on announcements so the
+    // scheduler's restoreWatermarks() can do a bounded `.last()` lookup
+    // per kind instead of materializing the entire table via .sortBy().
+    // Dexie auto-migrates additive index changes; existing rows get re-
+    // indexed on first open. fake-indexeddb supports compound indexes
+    // (verified in scheduler.restoreWatermarks watermark-restore tests).
+    this.version(2).stores({
+      announcements: "[pubkey+kind+d], eventId, kind, d, createdAt, [kind+createdAt]",
+    });
   }
 }

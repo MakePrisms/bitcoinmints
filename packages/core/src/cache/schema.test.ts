@@ -19,12 +19,14 @@ afterEach(async () => {
 });
 
 describe("BitcoinmintsDB schema", () => {
-  it("opens at version 1 with all 6 tables present", async () => {
+  it("opens at version 2 with all 6 tables present", async () => {
     const db = new BitcoinmintsDB(freshName());
     toDispose.push(db);
     await db.open();
 
-    expect(db.verno).toBe(1);
+    // v2 adds the [kind+createdAt] compound index to announcements (used by
+    // restoreWatermarks for bounded .last() lookups per kind).
+    expect(db.verno).toBe(2);
     const names = db.tables.map((t) => t.name).sort();
     expect(names).toEqual(
       ["announcements", "mintAggregate", "mintInfo", "profiles", "relayLists", "reviews"].sort(),
@@ -60,8 +62,14 @@ describe("BitcoinmintsDB schema", () => {
         .schema.indexes.map((ix) => ix.name)
         .sort();
 
-    // announcements secondary indexes: eventId, kind, d, createdAt
-    expect(indexNames("announcements")).toEqual(["createdAt", "d", "eventId", "kind"]);
+    // announcements secondary indexes: eventId, kind, d, createdAt + compound [kind+createdAt]
+    expect(indexNames("announcements")).toEqual([
+      "[kind+createdAt]",
+      "createdAt",
+      "d",
+      "eventId",
+      "kind",
+    ]);
     // reviews secondary indexes: eventId, d, createdAt, k
     expect(indexNames("reviews")).toEqual(["createdAt", "d", "eventId", "k"]);
     // mintInfo secondary: fetchedAt, ok
