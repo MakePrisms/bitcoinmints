@@ -35,9 +35,7 @@ function dForIndex(n: number): string {
 
 function makeReview(over: Partial<ReviewRow> & { pubkey: string; d: string }): ReviewRow {
   return {
-    pubkey: over.pubkey,
     kind: 38000,
-    d: over.d,
     eventId: `${"0".repeat(58)}${over.pubkey.slice(-6)}`,
     createdAt: 1_700_000_000,
     content: "",
