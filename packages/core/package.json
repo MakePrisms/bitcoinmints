@@ -8,5 +8,8 @@
   "scripts": {
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "nostr-tools": "^2.23.3"
   }
 }

@@ -1,0 +1,260 @@
+{
+  "_meta": {
+    "description": "Curated NIP-87 corpus for @bitcoinmints/core parse tests.",
+    "source": "/srv/forge/projects/bitcoinmints/audit/relay-data/full-nip87.json + full-38000.json",
+    "snapshot": "2026-04-16",
+    "notes": [
+      "Events are real, collected in the 2026-04-16 relay survey.",
+      "The 5 cashu38172BotSpam events share pubkey 972f233a... and use random 16-char d-tags — part of the 959-event 2025-02-13 burst documented in audit/relay-strategy-v1.md §4.",
+      "The 1 cashu38172Legacy event (Nostrodomo Mint) uses a 64-char raw-pubkey d-tag — pre-spec format.",
+      "No real 38172 event in the audit corpus uses the spec-conforming 66-char compressed-pubkey d-tag; see the report for the critical finding.",
+      "The 2 cashu38172SpecConforming events are SYNTHETIC: real mint URLs + contentMetadata, but the d-tag is rewritten to a valid 66-char compressed secp256k1 pubkey (derived by prefixing real mint pubkeys with 02/03). Their sig field is intentionally invalid (we do not re-sign) and the id does not match tag contents — parse layer does not verify signatures or event ids.",
+      "Fedimint events are real and filtered to ones that include at least one u tag (required by the parser). Layer A does not apply to kind:38173 — federation-id shape is TODO-v1.1.",
+      "Recommendations span three rating formats plus a no-rating case."
+    ]
+  },
+  "cashu38172BotSpam": [
+    {
+      "content": "{\"url\":\"https://mint.azzamo.net\",\"name\":\"Azzamo Cashu Mint\",\"description\":\"Unlock a new dimension of digital transactions with Azzamo cash Mint.\",\"version\":\"Nutshell/0.16.4\",\"nuts\":[\"NUT-07\",\"NUT-08\",\"NUT-09\"],\"motd\":\"Disclaimer: Azzamo Mint is in beta and experimental. Use small amounts only. Key Mantra: Not your keys = Not your coins.\",\"contact\":[[\"email\",\"support@azzamo.net\"],[\"twitter\",\"@me\"],[\"nostr\",\"npub...\"]]}",
+      "created_at": 1739410455,
+      "id": "005484e8d3beef38feb851b4005840d4532ce73f20f0761c8c85e06e3e0086c3",
+      "kind": 38172,
+      "pubkey": "972f233aa467bc9804032c0bce0a117daead5473c56c91e811a216bdd08c08cf",
+      "sig": "eb4c61474804acbac09a78be99ce7a80b225d60f2f2824ac37b2b67b1db98427a0baa5253f2500c2622ee7c988f545670b102d2ed90a46dbdf6bb5a69cb65a8f",
+      "tags": [
+        ["u", "https://mint.azzamo.net"],
+        ["nuts", "0,1,2"],
+        ["updated_at", "1739410455"],
+        ["d", "6hca1u9u9a39iiii"]
+      ]
+    },
+    {
+      "content": "{\"url\":\"https://mint.lnw.cash\",\"name\":\"lnwCash Mint\",\"description\":\"\\\"The ecash nutshell mint for freedom.\\\"\",\"version\":\"Nutshell/0.16.0\",\"nuts\":[\"NUT-07\",\"NUT-08\",\"NUT-09\"],\"contact\":[]}",
+      "created_at": 1739410543,
+      "id": "009b1ed07e26e97631ee845c23a36e5ea0e7c94e721abce43caaf54faa227782",
+      "kind": 38172,
+      "pubkey": "972f233aa467bc9804032c0bce0a117daead5473c56c91e811a216bdd08c08cf",
+      "sig": "f8c78242bc2bbfece8a281470e0c91421ca3da9e0dcd95ee0baa704d70cc4f13aef00fdf5dd14ee813bbe0da1767a464d5a4289f949d729be5cab14aea0c7e7a",
+      "tags": [
+        ["u", "https://mint.lnw.cash"],
+        ["nuts", "0,1,2"],
+        ["updated_at", "1739410543"],
+        ["d", "gm0cw0i8n92w8ya2"]
+      ]
+    },
+    {
+      "content": "{\"url\":\"https://mint.azzamo.net\",\"name\":\"Azzamo Cashu Mint\",\"description\":\"Unlock a new dimension of digital transactions with Azzamo cash Mint.\",\"version\":\"Nutshell/0.16.4\",\"nuts\":[\"NUT-07\",\"NUT-08\",\"NUT-09\"],\"motd\":\"Disclaimer: Azzamo Mint is in beta and experimental. Use small amounts only. Key Mantra: Not your keys = Not your coins.\",\"contact\":[[\"email\",\"support@azzamo.net\"],[\"twitter\",\"@me\"],[\"nostr\",\"npub...\"]]}",
+      "created_at": 1739410566,
+      "id": "00e5d6b029760d9368ae312546c03040f39ceecba8b2def646251b4b9f1b6bbb",
+      "kind": 38172,
+      "pubkey": "972f233aa467bc9804032c0bce0a117daead5473c56c91e811a216bdd08c08cf",
+      "sig": "638282664698a4394d7c66b92007b626ecdffd6d2038246b1f01269e82654531838f99ecb493f5bb99f5e20d39ac90a3c7adf6f37ea73c18d2af5161978d7b27",
+      "tags": [
+        ["u", "https://mint.azzamo.net"],
+        ["nuts", "0,1,2"],
+        ["updated_at", "1739410566"],
+        ["d", "9byv4xd5fx8xtjjm"]
+      ]
+    },
+    {
+      "content": "{\"url\":\"https://21mint.me\",\"name\":\"21Mint\",\"description\":\"Secure and privacy-oriented Cashu mint. All logs are automatically deleted every 24 hours.\",\"version\":\"Nutshell/0.16.4\",\"nuts\":[\"NUT-07\",\"NUT-08\",\"NUT-09\"],\"motd\":\"Welcome to 21Mint! We are currently in beta testing. Please report any issues or feedback. All logs are automatically deleted every 24 hours.\",\"contact\":[[\"nostr\",\"npub13suzac0smac4fr9zqvrrcr003kj2snr2m5a58j4gg6w3udejennsuc6ts3\"]]}",
+      "created_at": 1739410554,
+      "id": "0121b05ae161734d4a617b1e69eadd179b901cb2196fe50cab46e684edd4f566",
+      "kind": 38172,
+      "pubkey": "972f233aa467bc9804032c0bce0a117daead5473c56c91e811a216bdd08c08cf",
+      "sig": "98650eade787a3b86751db2972ae11cd92ca164670eb61ff59ac56275e56bb799d3bccd9f11ca18837380d329dccf0f890da2645292467a0516c41e9c5a3b4bc",
+      "tags": [
+        ["u", "https://21mint.me"],
+        ["nuts", "0,1,2"],
+        ["updated_at", "1739410554"],
+        ["d", "wza56s85l1pwzaz0"]
+      ]
+    },
+    {
+      "content": "{\"url\":\"https://cashu.boats\",\"name\":\"Kinda Reckless Mint\",\"description\":\"Reckless mint for the brave\",\"version\":\"Nutshell/0.16.3\",\"nuts\":[\"NUT-07\",\"NUT-08\",\"NUT-09\"],\"motd\":\"Go forth and spend with reckless abandon!\",\"contact\":[[\"email\",\"deodorize_average752@aleeas.com\"],[\"nostr\",\"npub18ehswvhxvl7992y2999lyq8lnnkyppn6ald5hfdmuvtcjmlu3v6sh9vrmc\"]]}",
+      "created_at": 1739410695,
+      "id": "0125348088164471a4b6b04a0e75175b7357f29c4f61eb995173d8b675c2e741",
+      "kind": 38172,
+      "pubkey": "972f233aa467bc9804032c0bce0a117daead5473c56c91e811a216bdd08c08cf",
+      "sig": "407aacb1362fb32806a0788994c9b568bc55aedaad54e74fb20661ab9479cada282a5e4266c3d73f1f6c8ff97f21b47eb1bd7802490ec64a816bbc3655d1435f",
+      "tags": [
+        ["u", "https://cashu.boats"],
+        ["nuts", "0,1,2"],
+        ["updated_at", "1739410695"],
+        ["d", "tsimxkld5mxmd9d5"]
+      ]
+    }
+  ],
+  "cashu38172Legacy": [
+    {
+      "content": "{\"name\":\"Nostrodomo Mint\",\"description\":\"Cashu mint for AI agents — Loom payment layer for Cascadia fleet\",\"contact\":[]}",
+      "created_at": 1774120532,
+      "id": "2451d5d6b79257eab6bb9f4e2b15dd9240ab6b82ce2b9b45ad38f17b235e08a4",
+      "kind": 38172,
+      "pubkey": "5fe928ae0970844f3c5253d2e85a88788486edcbd96c070334a4a2d0d0154a77",
+      "sig": "89383f7e7fba2105c465e1c0d3f6f00562e33f948c34976de53d75595d82afe1bdb4141b3de8076f4eccde1787b58e2f5552fb5ea4ce82fb9cebc84e2a529b94",
+      "tags": [
+        ["d", "5fe928ae0970844f3c5253d2e85a88788486edcbd96c070334a4a2d0d0154a77"],
+        ["u", "https://mint.sharegap.net"],
+        ["nuts", "1,2,3,4,5,6,7,9,10,11,12,14,20"],
+        ["n", "mainnet"],
+        ["t", "loom"],
+        ["t", "cascadia"]
+      ]
+    }
+  ],
+  "cashu38172SpecConforming": [
+    {
+      "content": "{\"name\":\"Mint Alpha (synthetic)\",\"about\":\"Representative spec-conformant Cashu announcement\",\"picture\":\"https://example.test/alpha.png\"}",
+      "created_at": 1770000000,
+      "id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "kind": 38172,
+      "pubkey": "02aa00000000000000000000000000000000000000000000000000000000000001",
+      "sig": "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+      "tags": [
+        ["d", "02aa00000000000000000000000000000000000000000000000000000000000001"],
+        ["u", "https://mint.alpha.test"],
+        ["nuts", "1,2,3,4,5,6,7,9,10,11,12,14,20"],
+        ["n", "mainnet"]
+      ]
+    },
+    {
+      "content": "",
+      "created_at": 1770000001,
+      "id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "kind": 38172,
+      "pubkey": "03bb00000000000000000000000000000000000000000000000000000000000002",
+      "sig": "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+      "tags": [
+        ["d", "03bb00000000000000000000000000000000000000000000000000000000000002"],
+        ["u", "https://mint.beta.test"],
+        ["u", "https://mint.beta.test/v1"],
+        ["nuts", "7,8,9,10,11,12,14"]
+      ]
+    }
+  ],
+  "fedimint38173": [
+    {
+      "content": "{\"federation_name\":\"Mutinynet-iroh\"}",
+      "created_at": 1775199515,
+      "id": "025aba4244de9845be458f414baf1e7db32ea9e767a9dfe116f16d628855b7e0",
+      "kind": 38173,
+      "pubkey": "bc5122e4d89e495ceb2a63134b5f208c7d17a1505d041d6a4eca7fc59eb71d50",
+      "sig": "91e271732d827651980dc6e25924c1d9c6896b8d864fcf4cca318f064f3ae2ab9eeb2782244bdb1dba93f11fb790a01f85dd24238c3d9e2dab2c228e98f37b95",
+      "tags": [
+        ["d", "103b0a005077185b64583e1cdcd2e3023f00a16e28ae5fcc79fffc156a36ef61"],
+        [
+          "u",
+          "fed11qvqyj3mfwfhksw309umrjen9vscnwefhx4jkve3j893rsvmpv56rzvpjxcexxvtp8p3rjvnrxsmr2vmxxv6n2wtzxv6rwv3cv9nxvefexumrscekx3jryvpeqqqyj3mfwfhksw309u6ngde4xymngvesxsurjetrxanxgefjv93kgcfkx33rxdtyx3snywp5xu6xvv3cx43nqc3svg6kxdm9x9jrxep3v9jnqdp5xcenjefjqyqjqypmpgq9qacctdj9s0sumnfwxq3lqzsku29wtlx8nlluz44rdmmp32qwkf"
+        ],
+        ["n", "signet"],
+        ["modules", "ln,mint,wallet,lnv2,meta"]
+      ]
+    },
+    {
+      "content": "{\"federation_name\":\"Orange Club Africa\"}",
+      "created_at": 1759923172,
+      "id": "117eedf75b1d17b716d36c72388c97ab9095764f553ee28d9bd306ec5359e899",
+      "kind": 38173,
+      "pubkey": "de2b138f51b9d52752ec4f44fc36153fe5ae5b7dc92c39cdbd6d4a9fb8f4334e",
+      "sig": "3cc86c13bf5147475ca6c5e8d1ea1bf0932d54b03be8531ab126e13c18d0394406a8354c515ff2d45bfa17f1ff926b511aa795b5d860570d352588a8535473ce",
+      "tags": [
+        ["d", "718e421be177486639330d198e870b7345ebd07b2866b5fd3797d73e4bc4c9af"],
+        [
+          "u",
+          "fed11qvqyj3mfwfhksw309ucnywf38yurwwf4x5unswf58pjxydpnx9jnxdpjvgurxdfjv4jkgd3hxguxvdekvsmrwd3nvc6r2ce3v93xyve4xsunwetxv56x2vfjqqqyj3mfwfhksw309ajkxc3jxejkgd3jxcerqdf5xs6r2c3svgunxvf4xuckxenrvyunxcn9vsmxvdr9xvensv3kvvmrgveexymkzvp5vcmnjer9xcunxdmpqyqjquvwggd7za6gvcunxrge36rsku69a0g8k2rxkh7n097h8e9ufjd09yck6f"
+        ],
+        ["n", "bitcoin"],
+        ["modules", "ln,mint,wallet,lnv2,meta,multi_sig_stability_pool"]
+      ]
+    },
+    {
+      "content": "",
+      "created_at": 1716511146,
+      "id": "1819482150b26768b6db2d766190e9012801c8e8f606a8dc79f67b11a3767a70",
+      "kind": 38173,
+      "pubkey": "36307f944a8ddfde2fcf09aa5ea472c51d0a9173108d1ffd5df7654ca9e7d1af",
+      "sig": "283f146a212725ca076579b69ee2b187b90013ed517e587de00a595040520c031d15ee3243264dc6e6a7ec90461accdf30a6e23f55bcc438e183aa0769370b83",
+      "tags": [
+        [
+          "u",
+          "fed11qgqzutrhwden5te0vejkg6tdd9h8gepwvejkg6tdd9h8gtn0v35kuen9v3jhyct5d9hkutnc09az7qqpyp938g2xae96wv4jhzg55u4q5tjcw037jsk6948walv95hlyrunm5tyfcdy",
+          "fedimint"
+        ],
+        ["d", "4b13a146ee4ba732b2b8914a72a0a2e5873e3e942da2d4eeefd85a5fe41f27ba"]
+      ]
+    }
+  ],
+  "recommendations38000": [
+    {
+      "content": "[5/5]",
+      "created_at": 1758213273,
+      "id": "001aa17b4673880e626b110fa284011dd2003609c161977fb84f43087c4802ce",
+      "kind": 38000,
+      "pubkey": "bf5ae4651d81d5a211fac31823458160853a920b2ed03881a578b908280fe690",
+      "sig": "427bcb7b43f04c30553e71fbf4b82a333c34dfdaa417d2e55607a9d2cc3871f804eb9feb0340e0218a52ce01b0cf73bfc42b7e2078716933e1d955c9294cf15f",
+      "tags": [
+        ["d", "b21068c84f5b12ca4fdf93f3e443d3bd7c27e8642d0d52ea2e4dce6fdbbee9df"],
+        ["k", "38173"],
+        ["rating", "5"]
+      ]
+    },
+    {
+      "content": "[3/5]",
+      "created_at": 1756753511,
+      "id": "0028826fe2134330b7d5a46fbd17a43b1368ec0f563f5636b585b1ad2ebf5136",
+      "kind": 38000,
+      "pubkey": "fe7e6de7f758dbdb06cac665a144eeb6898680298b4978ef1711b3e07238fe93",
+      "sig": "533f22c79b647b163d1115e43b8c8a772135beb465dad56dc04debddba4afd4324b53afa4f3d9e83458538390d1d328ae451c55f3c788e8ca4051ae2cf5b88c8",
+      "tags": [
+        ["d", "b21068c84f5b12ca4fdf93f3e443d3bd7c27e8642d0d52ea2e4dce6fdbbee9df"],
+        ["k", "38173"],
+        ["rating", "3"]
+      ]
+    },
+    {
+      "content": "[5/5] I'm SUPERMAX and this 'The Super Mint' is for educational and testing purposes. If you have questions or need help connecting, please contact me either on Nostr or email. Here's a quick site I made for information about The Super Mint here, https://tinyurl.com/thesupermint . Thanks all!",
+      "created_at": 1710867353,
+      "id": "00183f8eac08d8b34a75947a8e707600715b3d48aa8be35786891970fb2d7c7f",
+      "kind": 38000,
+      "pubkey": "ae1008d23930b776c18092f6eab41e4b09fcf3f03f3641b1b4e6ee3aa166d760",
+      "sig": "78eeace559cb384954f5f1abd34a142f2ffd97c3a0539b817552737b8a6569cfe8ad2a8310ee4e464037f728eb45f599eadab97fc0909bdfbefef038ef311f1b",
+      "tags": [
+        ["k", "38172"],
+        ["u", "https://obsessedjerky7.lnbits.com/cashu/api/v1/L4bNfiBtTyhEpZWdt6QTb4", "cashu"],
+        ["d", "psvef0yh2zk24tt7"]
+      ]
+    },
+    {
+      "content": "[5/5] Es un placer formar parte de esta bella comunidad, espero que este proyecto crezca y siga igual de positivo",
+      "created_at": 1746224475,
+      "id": "00230427076a58c4a2aa91f0236644b5125fcf76dfd165a5149424f9f3c7ee46",
+      "kind": 38000,
+      "pubkey": "2871a10447d80a1c7ca542488d9e09c10ed843641f6867b69fd92fb84bbe84dc",
+      "sig": "dcce911190c0b45a3bbc80f06a57dde11e9f7c189a8f9e2a47439d33b631fed5b8b7a06d00a775b4e2c321be2373a20b5cd749f4ad6c969919d9a3d1cb43c349",
+      "tags": [
+        ["k", "38172"],
+        ["u", "https://mint.cubabitcoin.org", "cashu"],
+        ["a", "38172:cashu-mint-pubkey:nda1zjgriivc1xvv", "wss://bitcoiner.social", "cashu"],
+        ["d", "nda1zjgriivc1xvv"]
+      ]
+    },
+    {
+      "content": "",
+      "created_at": 1718722206,
+      "id": "0015d072642960c96a589b06d341160e32d2c58cf5662d1a7742d765183e1d52",
+      "kind": 38000,
+      "pubkey": "7624c028f873a52abf025ea89ff8cd7599dcddd98c1199eebe3a7d76905bb138",
+      "sig": "1dd858e49587d0d4d24708dadcf99737858d5dd2e70ccaed632b25bbb690e24258b99818f45c50ed00e6043b1606e3e2edf3405e24a88d46481a1093d9150b53",
+      "tags": [
+        ["d", "c944b2fd1e7fe04ca87f9a57d7894cb69116cec6264cb52faa71228f4ec54cd6"],
+        ["k", "38173"],
+        [
+          "u",
+          "fed11qgqzz8mhwden5te0vejkg6tdd9h8gepwvchxjmm5w4hxgunp9e3k7mf0qyqjpj2ykt73ullqfj58lxjh67y5ed53zm8vvfjvk5h65ufz3a8v2nxky9wuce"
+        ],
+        ["n", "mainnet"]
+      ]
+    }
+  ]
+}
