@@ -13,12 +13,13 @@
  *      standard replaceable-event tiebreak clients converge on.
  *
  * Layer A gate for kind:38172: before writing an announcement we check
- * isValidCashuDTag(d). Invalid shapes (bot spam, non-hex garbage) are
- * returned as "rejected-invalid" and never hit the DB. kind:38173
- * (Fedimint) uses a sibling shape gate (isValidFedimintDTag) — every real
- * federation ID in the audit corpus is 64-char lowercase hex, so short /
- * junk d-tags with `["k","38173"]` are still filtered at the same choke
- * point as Cashu bot spam.
+ * isValidCashuDTag(d). Post-2026-04-17 the Cashu gate only rejects empty /
+ * oversized / non-printable-ASCII d-tags — the earlier strict pubkey regex
+ * rejected 99.8% of real on-wire events (see dtag.ts for the relaxation
+ * note). URL + Layer B signer binding are the real verification gates.
+ * kind:38173 (Fedimint) uses a sibling shape gate (isValidFedimintDTag) —
+ * every real federation ID in the audit corpus is 64-char lowercase hex,
+ * and that gate is unchanged by the Cashu relaxation.
  *
  * mintInfo and mintAggregate aren't event-based, so their CAS predicate
  * is a monotonically-increasing timestamp: `fetchedAt` for mintInfo,
@@ -64,10 +65,10 @@ export async function upsertAnnouncement(
   row: AnnouncementRow,
 ): Promise<UpsertResult> {
   // Layer A gate — reject invalid d-tag shapes before touching the DB.
-  // Cashu (38172) requires a 64- or 66-char secp256k1 pubkey shape;
-  // Fedimint (38173) requires a 64-char lowercase hex federation-id shape.
-  // A short/junk d-tag with `k=38173` slapped on is still bot spam and
-  // must be caught by the same firewall — don't free-pass by kind alone.
+  // Cashu (38172) accepts any non-empty printable-ASCII d-tag up to 256
+  // chars (post-2026-04-17 relaxation — see dtag.ts). Fedimint (38173)
+  // requires a 64-char lowercase hex federation-id shape — unchanged by
+  // the Cashu relaxation; junk d-tags with k=38173 still get filtered.
   if (row.kind === 38173) {
     if (!isValidFedimintDTag(row.d)) return "rejected-invalid";
   } else if (!isValidCashuDTag(row.d)) {
@@ -100,16 +101,14 @@ export async function upsertAnnouncement(
  *
  * The review's `d` points at a mint. When `k === 38172` (or `k` is absent,
  * which is how most in-the-wild Cashu reviews shape), we apply the same
- * Layer A d-regex gate that `upsertAnnouncement` uses — if the referenced
- * mint pubkey isn't 64/66-char hex, the review is bot-spam pointing at
- * bot-spam, returned as `rejected-invalid`. This is the firewall that
- * keeps the 959 zero-d-tag bot spam events (per relay-strategy §4) from
- * filtering up into the ranking aggregate.
+ * Layer A gate that `upsertAnnouncement` uses — post-relaxation, that
+ * means rejecting only empty / oversized / non-printable d-tags. URL +
+ * Layer B are the real verification gates on the mint side; here we just
+ * ensure the d pointer itself is a well-formed string.
  *
  * `k === 38173` (Fedimint) switches to the sibling `isValidFedimintDTag`
  * shape gate — every real federation ID in the audit corpus is lowercase
- * 64-char hex, so a short / junk d-tag with `k=38173` attached is still
- * bot spam and must be caught by the same firewall.
+ * 64-char hex. This gate is unchanged by the Cashu relaxation.
  *
  * Note: this low-level upsert is the mechanical write. It does NOT
  * materialize the `mintAggregate` row — the `reviews/` wrapper composes
@@ -122,9 +121,9 @@ export async function upsertReview(db: BitcoinmintsDB, row: ReviewRow): Promise<
   // Layer A gate — reject invalid d-tag shapes before touching the DB.
   // Reviews point at a target mint via `d`; the pointer-kind `k` selects
   // which shape gate applies. No `k` tag → treat as Cashu (the default
-  // for in-the-wild events per rating-tag-research §3). Fedimint rows
-  // still get a sibling shape check (64-char hex federation id) so junk
-  // d-tags with `k=38173` slapped on don't free-pass the firewall.
+  // for in-the-wild events per rating-tag-research §3). The Cashu gate is
+  // relaxed (any non-empty printable ASCII); the Fedimint gate remains
+  // 64-char hex.
   if (row.k === 38173) {
     if (!isValidFedimintDTag(row.d)) return "rejected-invalid";
   } else if (!isValidCashuDTag(row.d)) {

@@ -9,7 +9,7 @@ import { parseReview } from "./parse";
 
 /** Realistic 64-char x-only Cashu d-tag. */
 const D_VALID = "5fe928ae0970844f3c5253d2e85a88788486edcbd96c070334a4a2d0d0154a77";
-/** 16-char legacy / bot-spam d-tag. */
+/** 16-char curator-style d-tag (common on nos.lol, see dtag.ts relaxation note). */
 const D_LEGACY_16 = "psvef0yh2zk24tt7";
 
 function makeEvent(over: Partial<NostrEvent> & { tags?: string[][] } = {}): NostrEvent {
@@ -410,8 +410,8 @@ describe("parseReview — u tag collection (display helper)", () => {
 });
 
 describe("parseReview — parser is lenient on Layer A", () => {
-  it("16-char legacy d-tag still parses (gate is at upsert, not parse)", () => {
-    // The parser preserves whatever is there — bot-spam filtering is the
+  it("16-char curator-style d-tag still parses (gate is at upsert, not parse)", () => {
+    // The parser preserves whatever is there — shape filtering is the
     // cache layer's job. This keeps parser usable by raw-event log views.
     const row = parseReview(
       makeEvent({

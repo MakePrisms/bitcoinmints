@@ -4,7 +4,7 @@ import fixtures from "./__fixtures__/nip87-sample.json" with { type: "json" };
 import { parseMintAnnouncement, parseRecommendation } from "./parse";
 
 type Fixture = {
-  cashu38172BotSpam: NostrEvent[];
+  cashu38172Curator: NostrEvent[];
   cashu38172Legacy: NostrEvent[];
   cashu38172SpecConforming: NostrEvent[];
   fedimint38173: NostrEvent[];
@@ -13,9 +13,9 @@ type Fixture = {
 const f = fixtures as unknown as Fixture;
 
 describe("parseMintAnnouncement", () => {
-  it("parses a real kind:38172 bot-spam event into the expected shape", () => {
-    const event = f.cashu38172BotSpam[0];
-    if (!event) throw new Error("fixture missing cashu38172BotSpam[0]");
+  it("parses a real kind:38172 curator event into the expected shape", () => {
+    const event = f.cashu38172Curator[0];
+    if (!event) throw new Error("fixture missing cashu38172Curator[0]");
 
     const parsed = parseMintAnnouncement(event);
     expect(parsed).not.toBeNull();

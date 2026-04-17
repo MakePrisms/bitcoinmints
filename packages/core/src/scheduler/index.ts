@@ -92,7 +92,7 @@ export type SchedulerStats = {
    * `null` — either the `d` tag was missing/empty or the event was
    * unexpectedly not kind:38000. Counted separately from `rejectedByLayerA`
    * because it's a parser-level reject (malformed event) rather than a
-   * shape-gate reject (valid event pointing at bot-spam).
+   * shape-gate reject (valid event with a d-tag that fails the shape gate).
    */
   rejectedByParse: number;
   layerBPending: number;
@@ -715,9 +715,10 @@ export function createScheduler(config: SchedulerConfig): Scheduler {
             updateWatermark(event.kind, event.created_at);
             logPath(event.kind, event.id, relay, result === "replaced" ? "replaced" : "accepted");
           } else if (result === "rejected-invalid") {
-            // Layer A gate on reviews: pointing at a bot-spam d-tag. Count
-            // under the same stats bucket as the announcement Layer A
-            // rejection — it's the same firewall.
+            // Layer A gate on reviews: the `d` pointer failed the shape
+            // gate (empty, oversized, or non-printable post-relaxation).
+            // Counted under the same stats bucket as the announcement
+            // Layer A rejection — it's the same firewall.
             stats.rejectedByLayerA += 1;
             logPath(event.kind, event.id, relay, "rejected-layerA");
           } else {

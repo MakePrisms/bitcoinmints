@@ -29,7 +29,7 @@
  *
  * Parse does NOT reject on Layer A d-shape — the upsert gate handles that
  * so the parser stays pure and callable from tests, pagination dedup, etc.
- * Callers who want the bot-spam firewall use `upsertReviewWithAggregate`.
+ * Callers who want the Layer A shape firewall use `upsertReviewWithAggregate`.
  */
 import type { Event as NostrEvent } from "nostr-tools/core";
 import type { ReviewRow } from "../cache";

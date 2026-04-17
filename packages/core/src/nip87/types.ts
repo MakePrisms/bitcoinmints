@@ -63,10 +63,12 @@ export type MintRecommendation = {
   pubkey: string;
   createdAt: number;
   /**
-   * Target mint identifier — matches an announcement's d-tag. For Cashu
-   * this should be a 66-char compressed pubkey; for Fedimint, a
-   * federation id. Legacy events and bot spam use other shapes — the
-   * parser is lenient and preserves whatever is there.
+   * Target mint identifier — matches an announcement's d-tag. In the wild
+   * this is typically a 16-char curator-style tag (most common on nos.lol)
+   * or a 64-char secp256k1 pubkey; for Fedimint, a 64-char federation id.
+   * The parser is lenient and preserves whatever is there — shape gating
+   * happens at the cache layer (Layer A) with a permissive printable-ASCII
+   * rule; URL + Layer B are the real verification gates.
    */
   d: string;
   /** Parsed 0..5 rating (inclusive). See parse.ts for format precedence. */
