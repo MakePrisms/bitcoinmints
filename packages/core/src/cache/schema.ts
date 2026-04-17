@@ -194,14 +194,23 @@ export class BitcoinmintsDB extends Dexie {
     // v3: rename `bayesianRank` → `bayesianScore` on mintAggregate and add
     // `avgRating` to the index set so sort-by-avg queries don't need a full
     // table scan. This is the indexes materialized in PR #5's ranking
-    // aggregator. The prior `bayesianRank` index is dropped — rows written
-    // under v1/v2 (there are none shipped in production yet) would simply
-    // not be queryable by that old name. Any pre-existing rows in local
-    // dev caches are re-keyed by Dexie's additive migration; the shape
-    // change from `averageRating` to `avgRating` is a TypeScript-layer
-    // concern (Dexie doesn't type-check row payloads).
-    this.version(3).stores({
-      mintAggregate: "d, bayesianScore, avgRating, updatedAt",
-    });
+    // aggregator. The prior `bayesianRank` index is dropped.
+    //
+    // Upgrade semantics: Dexie auto-migrates the SCHEMA (indexes) but does
+    // NOT transform existing row PAYLOADS. A dev with a local v2 IndexedDB
+    // would otherwise have rows shaped `{d, averageRating, bayesianRank,
+    // updatedAt}` — the `averageRating` field is `avgRating` in v3 and
+    // `bayesianRank` doesn't exist — which would fail every v3 query shape
+    // (the indexes point at fields the row doesn't have). Since there's no
+    // prod data yet and the aggregate is re-derived from reviews on the
+    // next review upsert, a clean wipe is the correct migration: clear
+    // `mintAggregate`, let it repopulate from live review traffic.
+    this.version(3)
+      .stores({
+        mintAggregate: "d, bayesianScore, avgRating, updatedAt",
+      })
+      .upgrade(async (tx) => {
+        await tx.table("mintAggregate").clear();
+      });
   }
 }

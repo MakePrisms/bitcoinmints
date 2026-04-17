@@ -1,3 +1,4 @@
+import Dexie from "dexie";
 import { afterEach, describe, expect, it } from "vitest";
 import { BitcoinmintsDB } from "./schema";
 
@@ -92,5 +93,54 @@ describe("BitcoinmintsDB schema", () => {
     expect(await db.relayLists.count()).toBe(0);
     expect(await db.mintInfo.count()).toBe(0);
     expect(await db.mintAggregate.count()).toBe(0);
+  });
+
+  it("v2 → v3 upgrade clears the mintAggregate table", async () => {
+    // A dev who opened the app at v2 has rows shaped
+    // `{d, averageRating, bayesianRank, updatedAt}` — the `averageRating`
+    // field renamed to `avgRating` in v3 and `bayesianRank` was dropped,
+    // so without a migration hook those rows fail every v3 query shape
+    // (the indexes point at fields the row doesn't have). The v3 upgrade
+    // wipes the table and lets it repopulate from live review traffic.
+    const name = freshName();
+    // Open a separate Dexie handle declaring only the first two schema
+    // versions so we can seed a v2-shape row before the BitcoinmintsDB
+    // handle (which declares v3 and its upgrade hook) ever touches it.
+    const v2 = new Dexie(name);
+    v2.version(1).stores({
+      announcements: "[pubkey+kind+d], eventId, kind, d, createdAt",
+      reviews: "[pubkey+kind+d], eventId, d, createdAt, k",
+      profiles: "pubkey, createdAt",
+      relayLists: "pubkey, createdAt",
+      mintInfo: "d, fetchedAt, ok",
+      mintAggregate: "d, bayesianRank, updatedAt",
+    });
+    v2.version(2).stores({
+      announcements: "[pubkey+kind+d], eventId, kind, d, createdAt, [kind+createdAt]",
+    });
+    await v2.open();
+    // Seed a v2-shape row — the pre-rename payload.
+    await v2.table("mintAggregate").put({
+      d: "5fe928ae0970844f3c5253d2e85a88788486edcbd96c070334a4a2d0d0154a77",
+      averageRating: 4,
+      bayesianRank: 4 * Math.log10(11),
+      updatedAt: 1_700_000_000,
+    });
+    expect(await v2.table("mintAggregate").count()).toBe(1);
+    v2.close();
+
+    // Reopen via BitcoinmintsDB (declares v3 + upgrade hook) — the
+    // upgrade callback should clear the mintAggregate table.
+    const v3 = new BitcoinmintsDB(name);
+    toDispose.push(v3);
+    await v3.open();
+    expect(v3.verno).toBe(3);
+    expect(await v3.mintAggregate.count()).toBe(0);
+    // And the v3 indexes are queryable — a live review upsert would
+    // repopulate via these.
+    const byScore = await v3.mintAggregate.orderBy("bayesianScore").toArray();
+    expect(byScore).toEqual([]);
+    const byAvg = await v3.mintAggregate.orderBy("avgRating").toArray();
+    expect(byAvg).toEqual([]);
   });
 });
