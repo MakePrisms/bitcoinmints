@@ -232,4 +232,149 @@ describe("createPool", () => {
     // First call should have used the original single-entry list.
     expect(subscribeManyMock.mock.calls[0]?.[0]).toEqual(["wss://one.test"]);
   });
+
+  it("subscribe() with an empty filter array is a no-op (no subscribeMany, close is safe)", () => {
+    subscribeManyMock.mockReturnValue({ close: vi.fn() });
+
+    const pool = createPool({ relays: [...SEED_RELAYS] });
+    const handle = pool.subscribe({ filters: [], onEvent: () => {} });
+
+    expect(subscribeManyMock).not.toHaveBeenCalled();
+
+    // close() must not throw and must remain idempotent even with no
+    // underlying subscriptions.
+    expect(() => handle.close()).not.toThrow();
+    expect(() => handle.close()).not.toThrow();
+  });
+
+  it("closeOnEose:true without onEose: auto-closes after EOSE; subsequent events are dropped", () => {
+    let capturedOnevent: ((e: unknown) => void) | undefined;
+    let capturedOneose: (() => void) | undefined;
+    const innerClose = vi.fn();
+    subscribeManyMock.mockImplementation(
+      (
+        _relays: string[],
+        _filter: unknown,
+        params: { onevent: (e: unknown) => void; oneose?: () => void },
+      ) => {
+        capturedOnevent = params.onevent;
+        capturedOneose = params.oneose;
+        return { close: innerClose };
+      },
+    );
+
+    const received: string[] = [];
+    const pool = createPool({ relays: ["wss://a.test"] });
+    pool.subscribe({
+      filters: [{ kinds: [38000] }],
+      onEvent: (event) => received.push(event.id),
+      closeOnEose: true,
+      // Intentionally no onEose — exercises the closeOnEose-only branch
+      // (different oneose closure than the one with onEose set).
+    });
+
+    // oneose handler must be wired even without onEose so closeOnEose
+    // can do its job.
+    expect(capturedOneose).toBeDefined();
+
+    // Pre-EOSE event flows through.
+    const evt = (id: string) => ({
+      id,
+      pubkey: "pk",
+      created_at: 1,
+      kind: 38000,
+      tags: [],
+      content: "",
+      sig: "",
+    });
+    seenOnMock.set("pre", new Set([{ url: "wss://a.test" }]));
+    capturedOnevent?.(evt("pre"));
+    expect(received).toEqual(["pre"]);
+
+    // EOSE fires -> handle should auto-close.
+    capturedOneose?.();
+    expect(innerClose).toHaveBeenCalledTimes(1);
+
+    // Late event must be dropped (post-close gating).
+    seenOnMock.set("post", new Set([{ url: "wss://a.test" }]));
+    capturedOnevent?.(evt("post"));
+    expect(received).toEqual(["pre"]);
+  });
+
+  it("multiple concurrent subscribes are isolated: each handle gets its own events; closing one leaves the other live", () => {
+    // Each subscribeMany call gets its own onevent/closer pair. Capture
+    // them so we can fire events into one subscription at a time and
+    // verify isolation.
+    type Capture = {
+      onevent: (e: unknown) => void;
+      close: ReturnType<typeof vi.fn>;
+      filter: unknown;
+    };
+    const captures: Capture[] = [];
+    subscribeManyMock.mockImplementation(
+      (_relays: string[], filter: unknown, params: { onevent: (e: unknown) => void }) => {
+        const close = vi.fn();
+        captures.push({ onevent: params.onevent, close, filter });
+        return { close };
+      },
+    );
+
+    const pool = createPool({ relays: ["wss://a.test"] });
+    const receivedA: string[] = [];
+    const receivedB: string[] = [];
+    const handleA = pool.subscribe({
+      filters: [{ kinds: [38172] }],
+      onEvent: (event) => receivedA.push(event.id),
+    });
+    const handleB = pool.subscribe({
+      filters: [{ kinds: [38000] }],
+      onEvent: (event) => receivedB.push(event.id),
+    });
+
+    expect(captures).toHaveLength(2);
+    // Ordered by subscribe() call order.
+    expect(captures[0]?.filter).toEqual({ kinds: [38172] });
+    expect(captures[1]?.filter).toEqual({ kinds: [38000] });
+
+    // Fire an event into A only.
+    const evt = (id: string, kind: number) => ({
+      id,
+      pubkey: "pk",
+      created_at: 1,
+      kind,
+      tags: [],
+      content: "",
+      sig: "",
+    });
+    seenOnMock.set("a1", new Set([{ url: "wss://a.test" }]));
+    captures[0]?.onevent(evt("a1", 38172));
+    expect(receivedA).toEqual(["a1"]);
+    expect(receivedB).toEqual([]);
+
+    // Fire an event into B only.
+    seenOnMock.set("b1", new Set([{ url: "wss://a.test" }]));
+    captures[1]?.onevent(evt("b1", 38000));
+    expect(receivedA).toEqual(["a1"]);
+    expect(receivedB).toEqual(["b1"]);
+
+    // Close A. B's underlying closer must not fire and B must keep
+    // delivering.
+    handleA.close();
+    expect(captures[0]?.close).toHaveBeenCalledTimes(1);
+    expect(captures[1]?.close).not.toHaveBeenCalled();
+
+    seenOnMock.set("b2", new Set([{ url: "wss://a.test" }]));
+    captures[1]?.onevent(evt("b2", 38000));
+    expect(receivedB).toEqual(["b1", "b2"]);
+
+    // Late event into A is dropped (post-close gating from Fix 3
+    // applies per-handle).
+    seenOnMock.set("a2", new Set([{ url: "wss://a.test" }]));
+    captures[0]?.onevent(evt("a2", 38172));
+    expect(receivedA).toEqual(["a1"]);
+
+    // Closing B now tears down only B's closer.
+    handleB.close();
+    expect(captures[1]?.close).toHaveBeenCalledTimes(1);
+  });
 });
