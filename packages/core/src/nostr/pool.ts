@@ -32,7 +32,13 @@ export type SubscribeOptions = {
   filters: Filter[];
   /** Called for each matching event; `relay` is the wss:// URL that delivered it. */
   onEvent: (event: NostrEvent, relay: string) => void;
-  /** Called once per relay when end-of-stored-events is received. */
+  /**
+   * Called once after all relays signal EOSE (or eoseTimeout fires). The
+   * `relay` arg is the placeholder `"*"` because subscribeMany aggregates
+   * EOSE across relays — the underlying API does not surface which relay
+   * EOSE'd. Per-relay EOSE will require switching to per-relay subscribes
+   * (deferred to PR #4).
+   */
   onEose?: (relay: string) => void;
   /** If true, close the subscription after all relays signal EOSE. Default: false (live). */
   closeOnEose?: boolean;
@@ -78,8 +84,13 @@ export function createPool(config: PoolConfig): Pool {
           },
           oneose: opts.onEose
             ? () => {
-                // subscribeMany signals oneose once after all relays EOSE
-                // (the relay URL is not provided — we emit a placeholder).
+                // subscribeMany signals oneose once total (after all relays
+                // EOSE, or eoseTimeout fires) without surfacing which relay
+                // EOSE'd. Emit "*" as a placeholder so callers can still
+                // observe the boundary between stored and live events.
+                // TODO(PR #4): if per-relay EOSE is needed (e.g. for
+                // single-slow-relay timeout handling), switch to
+                // per-relay subscribes instead of subscribeMany.
                 opts.onEose?.("*");
                 if (opts.closeOnEose) {
                   for (const c of closers) c.close();

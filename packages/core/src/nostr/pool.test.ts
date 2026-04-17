@@ -139,6 +139,35 @@ describe("createPool", () => {
     expect(received[0]?.relay).toBe("wss://a.test");
   });
 
+  it("fires onEose once with the '*' placeholder (subscribeMany aggregates EOSE)", () => {
+    // subscribeMany emits a single oneose after all relays EOSE without
+    // surfacing which relay EOSE'd. Our wrapper documents this by passing
+    // "*" — callers must not assume one-call-per-relay semantics.
+    let capturedOneose: (() => void) | undefined;
+    subscribeManyMock.mockImplementation(
+      (_relays: string[], _filter: unknown, params: { oneose?: () => void }) => {
+        capturedOneose = params.oneose;
+        return { close: () => {} };
+      },
+    );
+
+    const eoseRelays: string[] = [];
+    const pool = createPool({ relays: ["wss://a.test", "wss://b.test"] });
+    pool.subscribe({
+      filters: [{ kinds: [38000] }],
+      onEvent: () => {},
+      onEose: (relay) => eoseRelays.push(relay),
+    });
+
+    capturedOneose?.();
+    expect(eoseRelays).toEqual(["*"]);
+
+    // A second oneose tick (e.g. duplicate fire) would still report "*"
+    // — this is contract, not bug.
+    capturedOneose?.();
+    expect(eoseRelays).toEqual(["*", "*"]);
+  });
+
   it("close() forwards the configured relay list to SimplePool.close", () => {
     subscribeManyMock.mockReturnValue({ close: vi.fn() });
 
