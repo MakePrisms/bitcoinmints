@@ -2,66 +2,135 @@ import type { AnnouncementRow, MintAggregateRow, MintInfoRow } from "@bitcoinmin
 import type { JSX } from "react";
 
 /**
- * Raw per-mint dump — one field per line, monospace, no formatting beyond
- * labels + JSON.stringify. Spec (PR #6 brief) locks every field:
+ * Two-tier X-ray render of a single mint.
  *
- *   pubkey: ...
- *   d: ...
- *   kind: ...
- *   u: [...]                            // full array JSON, no truncation
- *   createdAt: <epoch seconds>
- *   verifiedBySignerBinding: <true|false|null>
- *   reviewCount: ...                    // 0 if no aggregate row
- *   ratedCount: ...
- *   avgRating: ...
- *   bayesianScore: ...
- *   aggregate.updatedAt: ...
- *   mintInfo: <pretty-printed JSON>     // or `mintInfo: (none)` if no row
+ * Tier 1 — human-readable top matter pulled out of `info.infoJson` (NUT-06):
+ *   name, description, version, motd, contact, urls, rating/score/verified.
  *
- * Rows separated by <hr>.
+ * Tier 0 — de-emphasized technical identifiers (d, pubkey, kind) pinned below
+ *   the top matter for X-ray debugging; deliberately small + faded, not
+ *   user-facing content.
+ *
+ * Tier 2 — collapsed <details> blocks for the raw mintInfo, announcement, and
+ *   aggregate JSON, so the full shape (including rawTags, sig, etc.) stays
+ *   inspectable without drowning the first glance.
+ *
+ * Browser-native <details> disclosure — no dep, no state, no animation.
  */
 type Props = {
   aggregate: MintAggregateRow;
   announcement: AnnouncementRow | undefined;
   info: MintInfoRow | undefined;
-  /**
-   * Final row in the list gets no trailing <hr>. Keeping the decision with
-   * the row itself so the parent stays a dumb `.map()`.
-   */
+  /** Final row in the list gets no trailing <hr>. */
   isLast: boolean;
 };
 
+/**
+ * Render the NUT-06 `contact` field. The spec says it's an array of
+ * `{ method, info }` objects, but mints in the wild have been seen emitting
+ * the older array-of-tuples shape (`[[method, info], ...]`). Handle both
+ * defensively — anything that doesn't match either shape is skipped rather
+ * than crashing the row render.
+ */
+function renderContact(contact: unknown): string[] {
+  if (!Array.isArray(contact)) return [];
+  const lines: string[] = [];
+  for (const entry of contact) {
+    if (Array.isArray(entry) && entry.length >= 2) {
+      // Legacy tuple shape: ["email", "foo@bar"].
+      const [method, value] = entry;
+      if (typeof method === "string" && typeof value === "string") {
+        lines.push(`contact: ${method} ${value}`);
+      }
+      continue;
+    }
+    if (entry && typeof entry === "object") {
+      // NUT-06 object shape: { method, info }.
+      const obj = entry as Record<string, unknown>;
+      const method = obj.method;
+      const value = obj.info;
+      if (typeof method === "string" && typeof value === "string") {
+        lines.push(`contact: ${method} ${value}`);
+      }
+    }
+  }
+  return lines;
+}
+
 export function MintRow({ aggregate, announcement, info, isLast }: Props): JSX.Element {
-  // Announcement fields come from the joined row. If the announcement is
-  // still undefined the aggregate exists without an announcement — possible
-  // when the review lands first and the mint announcement hasn't arrived
-  // yet. We render the aggregate fields anyway so the X-ray shows the
-  // dangling state rather than hiding it.
+  const body = info?.infoJson as Record<string, unknown> | undefined;
+
+  const name = typeof body?.name === "string" && body.name.length > 0 ? body.name : undefined;
+  const description = typeof body?.description === "string" ? body.description : undefined;
+  const version = typeof body?.version === "string" ? body.version : undefined;
+  const motd = typeof body?.motd === "string" ? body.motd : undefined;
+  const contactLines = renderContact(body?.contact);
+
+  const urls = announcement?.u ?? [];
+
+  const ratedCount = aggregate.ratedCount;
+  const reviewCount = aggregate.reviewCount;
+  const avg = aggregate.avgRating;
+  const ratingLine =
+    avg === null
+      ? `rating: — (${reviewCount} total, 0 rated)`
+      : `rating: ${avg}/5 (${ratedCount} ratings, ${reviewCount} total)`;
+
+  const verifiedLabel = announcement
+    ? announcement.verifiedBySignerBinding === true
+      ? "verified"
+      : announcement.verifiedBySignerBinding === false
+        ? "unverified"
+        : "pending"
+    : "(no announcement)";
+
+  // Tier 0 identifiers — present even if announcement is missing so the
+  // dangling-aggregate state is still visible.
   const pubkey = announcement?.pubkey ?? "(no announcement)";
   const d = aggregate.d;
   const kind = announcement?.kind ?? "(no announcement)";
-  const u = announcement?.u ?? [];
-  const createdAt = announcement?.createdAt ?? "(no announcement)";
-  const verifiedBySignerBinding = announcement
-    ? String(announcement.verifiedBySignerBinding)
-    : "(no announcement)";
-
-  const mintInfoLine = info ? `mintInfo: ${JSON.stringify(info, null, 2)}` : "mintInfo: (none)";
 
   return (
     <>
-      <div>pubkey: {pubkey}</div>
-      <div>d: {d}</div>
-      <div>kind: {String(kind)}</div>
-      <div>u: {JSON.stringify(u)}</div>
-      <div>createdAt: {String(createdAt)}</div>
-      <div>verifiedBySignerBinding: {verifiedBySignerBinding}</div>
-      <div>reviewCount: {aggregate.reviewCount}</div>
-      <div>ratedCount: {aggregate.ratedCount}</div>
-      <div>avgRating: {String(aggregate.avgRating)}</div>
-      <div>bayesianScore: {aggregate.bayesianScore}</div>
-      <div>aggregate.updatedAt: {aggregate.updatedAt}</div>
-      <pre>{mintInfoLine}</pre>
+      <div>name: {name ?? "(no name)"}</div>
+      {description && <div>description: {description}</div>}
+      {urls.map((url) => (
+        <div key={url}>url: {url}</div>
+      ))}
+      <div>{ratingLine}</div>
+      <div>score: {aggregate.bayesianScore}</div>
+      <div>verified: {verifiedLabel}</div>
+      {version && <div>version: {version}</div>}
+      {motd && <div>motd: {motd}</div>}
+      {contactLines.map((line) => (
+        <div key={line}>{line}</div>
+      ))}
+
+      <div className="text-xs opacity-60">
+        <div>d: {d}</div>
+        <div>pubkey: {pubkey}</div>
+        <div>kind: {String(kind)}</div>
+      </div>
+
+      {info ? (
+        <details>
+          <summary>raw mintInfo</summary>
+          <pre>{JSON.stringify(info, null, 2)}</pre>
+        </details>
+      ) : (
+        <div>mintInfo: (none)</div>
+      )}
+      {announcement && (
+        <details>
+          <summary>raw announcement</summary>
+          <pre>{JSON.stringify(announcement, null, 2)}</pre>
+        </details>
+      )}
+      <details>
+        <summary>raw aggregate</summary>
+        <pre>{JSON.stringify(aggregate, null, 2)}</pre>
+      </details>
+
       {!isLast && <hr />}
     </>
   );
