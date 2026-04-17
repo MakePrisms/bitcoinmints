@@ -362,9 +362,16 @@ function makeFakePool(): {
   };
 }
 
-/** Drain Layer B work — same pattern as scheduler unit tests. */
-async function drainLayerB(): Promise<void> {
-  for (let i = 0; i < 10; i++) await new Promise<void>((r) => setTimeout(r, 0));
+/**
+ * Drain Layer B work. Poll `layerBPending` until 0 (or timeout) — robust
+ * against the per-task transaction wrapping that adds microtask hops.
+ * The previous fixed 10-yield drain raced under slower CI runners.
+ */
+async function drainLayerB(sched?: { getStats: () => { layerBPending: number } }): Promise<void> {
+  for (let i = 0; i < 200; i++) {
+    if (sched && sched.getStats().layerBPending === 0 && i >= 5) return;
+    await new Promise<void>((r) => setTimeout(r, 0));
+  }
 }
 
 /**
@@ -420,7 +427,7 @@ describe("integration: scheduler full pipeline", () => {
     await sched.start();
 
     await pushCashuCorpus(pushEvent);
-    await drainLayerB();
+    await drainLayerB(sched);
 
     // Stats: same accept/reject as the parse → cache integration above
     // (5 bot-spam rejected at Layer A; 1 legacy + 2 spec-conforming + 3
@@ -501,7 +508,7 @@ describe("integration: scheduler full pipeline", () => {
     });
     await sched1.start();
     await pushCashuCorpus(push1);
-    await drainLayerB();
+    await drainLayerB(sched1);
     await sched1.stop();
 
     const round1Counts = {
@@ -533,7 +540,7 @@ describe("integration: scheduler full pipeline", () => {
     });
     await sched2.start();
     await pushCashuCorpus(push2);
-    await drainLayerB();
+    await drainLayerB(sched2);
     await sched2.stop();
 
     // Same row counts — no duplicates introduced by the replay.
