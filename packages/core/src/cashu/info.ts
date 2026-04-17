@@ -189,11 +189,42 @@ export async function fetchMintInfo(
 /** A wrapped fetcher with TTL caching + concurrency limiting. */
 export type MintInfoFetcher = (url: string) => Promise<MintInfoResult>;
 
+/**
+ * Default success-path TTL for the per-URL info cache (5 minutes).
+ *
+ * Successful /v1/info responses change rarely — the mint pubkey + nuts
+ * support are baseline config. Caching the OK response longer means the
+ * scheduler can re-enqueue Layer B for replays without hammering mints.
+ */
+export const INFO_TTL_OK_MS = 5 * 60_000;
+
+/**
+ * Default failure-path TTL (30s).
+ *
+ * Failures (timeouts, 5xx, malformed JSON) often clear quickly — a flaky
+ * mint on a transient outage shouldn't have all retries blocked for the
+ * full success TTL. Keep the cap short so the next legitimate /v1/info
+ * attempt isn't held back by a stale failure cache entry.
+ */
+export const INFO_TTL_FAIL_MS = 30_000;
+
 export type MintInfoFetcherOptions = {
   /** Max concurrent in-flight fetches across the entire fetcher. */
   concurrency: number;
-  /** Cache TTL in ms. Cached `MintInfoResult`s younger than this short-circuit. */
-  ttlMs: number;
+  /**
+   * Cache TTL in ms. If supplied, applies to BOTH ok and fail responses
+   * (legacy single-TTL mode). Prefer `ttlOkMs` + `ttlFailMs` for
+   * production code so a flaky mint can be re-tried sooner than a stable
+   * one is re-fetched.
+   *
+   * If both `ttlMs` and `ttlOkMs`/`ttlFailMs` are provided, the split
+   * values win (single `ttlMs` is treated as the legacy default).
+   */
+  ttlMs?: number;
+  /** TTL for ok responses. Defaults to `ttlMs` if set, else INFO_TTL_OK_MS. */
+  ttlOkMs?: number;
+  /** TTL for !ok responses. Defaults to `ttlMs` if set, else INFO_TTL_FAIL_MS. */
+  ttlFailMs?: number;
   /**
    * Override the underlying single-fetch function. Useful in tests; defaults
    * to `fetchMintInfo`.
@@ -203,7 +234,13 @@ export type MintInfoFetcherOptions = {
   now?: () => number;
 };
 
-type CacheEntry = { result: MintInfoResult; at: number };
+/**
+ * Cache entry — preserves the TTL the entry was admitted with, so that an
+ * ok→fail transition (or fail→ok) doesn't accidentally use the wrong TTL
+ * for eviction. Each cache write picks the TTL based on the response's ok
+ * field, and the entry remembers its budget.
+ */
+type CacheEntry = { result: MintInfoResult; at: number; ttlMs: number };
 
 /**
  * Build a fetcher that:
@@ -221,8 +258,17 @@ export function createMintInfoFetcher(opts: MintInfoFetcherOptions): MintInfoFet
   if (opts.concurrency < 1) {
     throw new Error("createMintInfoFetcher: concurrency must be >= 1");
   }
-  if (opts.ttlMs < 0) {
-    throw new Error("createMintInfoFetcher: ttlMs must be >= 0");
+  // Resolve the effective ok / fail TTLs. Precedence:
+  //   1. Explicit ttlOkMs / ttlFailMs (split mode — preferred).
+  //   2. Legacy `ttlMs` applied to both arms.
+  //   3. INFO_TTL_OK_MS / INFO_TTL_FAIL_MS defaults.
+  const ttlOkMs = opts.ttlOkMs ?? opts.ttlMs ?? INFO_TTL_OK_MS;
+  const ttlFailMs = opts.ttlFailMs ?? opts.ttlMs ?? INFO_TTL_FAIL_MS;
+  if (ttlOkMs < 0) {
+    throw new Error("createMintInfoFetcher: ttlOkMs must be >= 0");
+  }
+  if (ttlFailMs < 0) {
+    throw new Error("createMintInfoFetcher: ttlFailMs must be >= 0");
   }
 
   const fetchImpl = opts.fetchImpl ?? fetchMintInfo;
@@ -255,8 +301,10 @@ export function createMintInfoFetcher(opts: MintInfoFetcherOptions): MintInfoFet
 
   return async function fetcher(url: string): Promise<MintInfoResult> {
     // 1. Cache check — short-circuits both success and failure within TTL.
+    //    Each entry remembers the TTL it was admitted with (ok vs fail) so
+    //    an entry can't outlive its own budget if the global TTLs change.
     const cached = cache.get(url);
-    if (cached && now() - cached.at < opts.ttlMs) {
+    if (cached && now() - cached.at < cached.ttlMs) {
       return cached.result;
     }
 
@@ -269,7 +317,11 @@ export function createMintInfoFetcher(opts: MintInfoFetcherOptions): MintInfoFet
       await acquire();
       try {
         const result = await fetchImpl(url);
-        cache.set(url, { result, at: now() });
+        // Pick TTL based on response — ok responses get the longer cache
+        // window; failures expire quickly so a flaky mint can be retried
+        // soon. The TTL is captured per-entry above.
+        const entryTtl = result.ok ? ttlOkMs : ttlFailMs;
+        cache.set(url, { result, at: now(), ttlMs: entryTtl });
         return result;
       } finally {
         release();

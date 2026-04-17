@@ -303,5 +303,76 @@ describe("createMintInfoFetcher — concurrency limiter", () => {
     expect(() => createMintInfoFetcher({ concurrency: 0, ttlMs: 1000 })).toThrow();
     expect(() => createMintInfoFetcher({ concurrency: -1, ttlMs: 1000 })).toThrow();
     expect(() => createMintInfoFetcher({ concurrency: 1, ttlMs: -1 })).toThrow();
+    // Split TTL validation
+    expect(() => createMintInfoFetcher({ concurrency: 1, ttlOkMs: -1 })).toThrow();
+    expect(() => createMintInfoFetcher({ concurrency: 1, ttlFailMs: -1 })).toThrow();
+  });
+});
+
+describe("createMintInfoFetcher — split ok/fail TTL", () => {
+  it("expires fail entries on the shorter ttlFailMs even when ttlOkMs is long", async () => {
+    // Pin the silent-failure fix: a flaky mint should be re-tried within
+    // ttlFailMs, not pinned for the full ok TTL window.
+    const fetchImpl = vi
+      .fn<(url: string) => Promise<MintInfoResult>>()
+      .mockResolvedValueOnce({ ok: false, error: "non-2xx (500)", status: 500 })
+      .mockResolvedValueOnce({ ok: true, info: { pubkey: "02abc" } });
+    let now = 0;
+    const fetcher = createMintInfoFetcher({
+      concurrency: 4,
+      ttlOkMs: 5 * 60_000, // 5 min for OK
+      ttlFailMs: 30_000, // 30 s for fail
+      fetchImpl,
+      now: () => now,
+    });
+
+    const r1 = await fetcher("https://broken.example.com");
+    expect(r1.ok).toBe(false);
+
+    // 31s later — fail TTL has expired, but ok TTL would still be active.
+    now = 31_000;
+    const r2 = await fetcher("https://broken.example.com");
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    expect(r2.ok).toBe(true);
+  });
+
+  it("keeps ok entries cached beyond the short fail TTL", async () => {
+    const fetchImpl = vi
+      .fn<(url: string) => Promise<MintInfoResult>>()
+      .mockResolvedValue({ ok: true, info: { pubkey: "02abc" } });
+    let now = 0;
+    const fetcher = createMintInfoFetcher({
+      concurrency: 4,
+      ttlOkMs: 5 * 60_000,
+      ttlFailMs: 30_000,
+      fetchImpl,
+      now: () => now,
+    });
+
+    await fetcher("https://mint.example.com");
+    // Past the fail TTL but well within the ok TTL — must NOT re-fetch.
+    now = 60_000;
+    await fetcher("https://mint.example.com");
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it("legacy single ttlMs continues to apply to both arms", async () => {
+    // Backwards-compat: callers passing only ttlMs get the original
+    // single-bucket behavior.
+    const fetchImpl = vi
+      .fn<(url: string) => Promise<MintInfoResult>>()
+      .mockResolvedValueOnce({ ok: false, error: "non-2xx (500)", status: 500 })
+      .mockResolvedValueOnce({ ok: false, error: "non-2xx (500)", status: 500 });
+    let now = 0;
+    const fetcher = createMintInfoFetcher({
+      concurrency: 4,
+      ttlMs: 60_000,
+      fetchImpl,
+      now: () => now,
+    });
+    await fetcher("https://broken.example.com");
+    now = 30_000; // halfway through legacy TTL
+    await fetcher("https://broken.example.com");
+    expect(fetchImpl).toHaveBeenCalledTimes(1); // single TTL still in effect
   });
 });
