@@ -285,6 +285,33 @@ describe("parseReview — rating formats (precedence)", () => {
   });
 });
 
+describe("parseReview — malformed rating tag forms", () => {
+  it("malformed rating tag forms fall through to null (no content fallback)", () => {
+    // Each of these shapes is "structurally a rating tag" but the value
+    // payload is unusable — either not a number, empty string, missing,
+    // or `null`-as-string from a buggy emitter. None should parse to a
+    // rating, and without a content rating signal all should land at null.
+    const cases: string[][] = [
+      ["rating", "foo", "5"],
+      ["rating", ""],
+      ["rating"],
+      ["rating", "", "5"],
+      // `null` coerced to a string via a buggy JSON emitter. The parser
+      // guards `typeof t[1] !== "string"` which catches the raw-null
+      // form; including it defensively in case a relay rewrites null
+      // into the literal string "null".
+      ["rating", null as unknown as string, "5"],
+    ];
+    for (const tag of cases) {
+      const row = parseReview(
+        makeEvent({ tags: [["d", D_VALID], tag as string[]] }),
+      );
+      expect(row).not.toBeNull();
+      expect(row?.rating).toBeNull();
+    }
+  });
+});
+
 describe("parseReview — null fallback", () => {
   it("returns rating: null when no rating tag and no content signal", () => {
     const row = parseReview(

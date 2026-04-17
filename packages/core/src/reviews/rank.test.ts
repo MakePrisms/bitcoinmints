@@ -145,3 +145,28 @@ describe("rankMints — limit", () => {
     expect(top3[1]!.bayesianScore).toBeGreaterThan(top3[2]!.bayesianScore);
   });
 });
+
+describe("rankMints — limit bounds", () => {
+  it("limit=0 returns an empty array, no throw", async () => {
+    const db = await freshDB();
+    await seedMint(db, dForIndex(60), 5, 3);
+    await seedMint(db, dForIndex(61), 4, 2);
+    expect(await rankMints(db, 0)).toEqual([]);
+  });
+
+  it("limit=Infinity returns every mint in score-descending order", async () => {
+    // Dexie's .limit() accepts Number.POSITIVE_INFINITY and clamps to the
+    // full result set (verified empirically in fake-indexeddb via this
+    // test). If this assertion ever breaks, swap in a high finite limit.
+    const db = await freshDB();
+    await seedMint(db, dForIndex(70), 5, 10); // 5 * log10(11) ≈ 5.21
+    await seedMint(db, dForIndex(71), 4, 3); // 4 * log10(4)  ≈ 2.41
+    await seedMint(db, dForIndex(72), 5, 1); // 5 * log10(2)  ≈ 1.505
+    const ranked = await rankMints(db, Number.POSITIVE_INFINITY);
+    expect(ranked).toHaveLength(3);
+    expect(ranked.map((r) => r.d)).toEqual([dForIndex(70), dForIndex(71), dForIndex(72)]);
+    // Strictly non-increasing.
+    expect(ranked[0]!.bayesianScore).toBeGreaterThan(ranked[1]!.bayesianScore);
+    expect(ranked[1]!.bayesianScore).toBeGreaterThan(ranked[2]!.bayesianScore);
+  });
+});

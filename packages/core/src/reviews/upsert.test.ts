@@ -188,6 +188,45 @@ describe("upsertReviewWithAggregate — CAS + aggregate-stays-in-sync", () => {
   });
 });
 
+describe("upsertReviewWithAggregate — concurrent CAS + aggregate race", () => {
+  it("two concurrent upserts for the same d (different pubkeys) converge — aggregate reflects BOTH reviews, 5 trials", async () => {
+    // Regression for the race where the review CAS upsert and the aggregate
+    // recompute are in the same transaction: if both concurrent upserts
+    // read the reviews table before either writes, the recompute would
+    // see only one review and the aggregate would drop to reviewCount=1.
+    // Dexie serializes rw-rw transactions on the same tables, so the
+    // correct outcome is both reviews land AND the aggregate sees both.
+    // Mirrors the announcement-side regression in cache/upsert.test.ts (~L288).
+    const pkA = `pk-a${"0".repeat(60)}`;
+    const pkB = `pk-b${"0".repeat(60)}`;
+    const reviewA = makeReview({ pubkey: pkA, eventId: EID_LOW, rating: 5 });
+    const reviewB = makeReview({ pubkey: pkB, eventId: EID_HIGH, rating: 1 });
+
+    for (let trial = 0; trial < 5; trial++) {
+      const db = await freshDB();
+      const ops =
+        trial % 2 === 0
+          ? [upsertReviewWithAggregate(db, reviewA), upsertReviewWithAggregate(db, reviewB)]
+          : [upsertReviewWithAggregate(db, reviewB), upsertReviewWithAggregate(db, reviewA)];
+      const results = await Promise.all(ops);
+
+      // Both reviews land — distinct (pubkey, kind, d) triples don't CAS-fail.
+      expect(results).toEqual(["inserted", "inserted"]);
+      expect(await db.reviews.count()).toBe(2);
+
+      // Aggregate reflects BOTH reviews — this is the invariant that
+      // would break if the recompute ran on a pre-write snapshot of
+      // the reviews table.
+      const agg = await db.mintAggregate.get(D_VALID);
+      expect(agg).toBeDefined();
+      expect(agg?.reviewCount).toBe(2);
+      expect(agg?.ratedCount).toBe(2);
+      expect(agg?.avgRating).toBe(3); // (5 + 1) / 2
+      expect(agg?.bayesianScore).toBeCloseTo(3 * Math.log10(3), 6);
+    }
+  });
+});
+
 describe("upsertReviewWithAggregate — Layer A gate", () => {
   it("16-char bot-spam d-tag → rejected-invalid, no review row, no aggregate row", async () => {
     const db = await freshDB();
