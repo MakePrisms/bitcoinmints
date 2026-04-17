@@ -258,3 +258,46 @@ describe("integration: CAS convergence under simulated multi-relay race", () => 
     }
   });
 });
+
+describe("integration: Layer A enforced at cache, not parser", () => {
+  it("bot-spam events parse successfully but are rejected by upsertAnnouncement", async () => {
+    // Pin the design choice: parser is lenient, the cache is the gate. This
+    // matters because downstream code (e.g. raw-event log, debugger views)
+    // can still see what came over the wire even if it never lands.
+    const db = await freshDB();
+    let parsedCount = 0;
+    let rejectedAtCacheCount = 0;
+    for (const e of f.cashu38172BotSpam) {
+      const parsed = parseMintAnnouncement(e);
+      // Parser does NOT gate on Layer A — every bot-spam event parses fine.
+      expect(parsed).not.toBeNull();
+      if (!parsed) continue;
+      parsedCount++;
+      // Bot-spam d-tags are 16-char random — regex doesn't match.
+      expect(isValidCashuDTag(parsed.d)).toBe(false);
+      const result = await upsertAnnouncement(db, toAnnouncementRow(parsed));
+      // The cache is where Layer A bites.
+      expect(result).toBe("rejected-invalid");
+      rejectedAtCacheCount++;
+    }
+    expect(parsedCount).toBe(f.cashu38172BotSpam.length);
+    expect(rejectedAtCacheCount).toBe(f.cashu38172BotSpam.length);
+    // Nothing landed despite all 5 parsing successfully — design contract held.
+    expect(await db.announcements.count()).toBe(0);
+  });
+
+  it("the same Layer A check lets valid events through when the parser hands them off", async () => {
+    // Mirror of the above for the positive side — valid parses that land.
+    const db = await freshDB();
+    const allValid: NostrEvent[] = [...f.cashu38172Legacy, ...f.cashu38172SpecConforming];
+    for (const e of allValid) {
+      const parsed = parseMintAnnouncement(e);
+      expect(parsed).not.toBeNull();
+      if (!parsed) continue;
+      expect(isValidCashuDTag(parsed.d)).toBe(true);
+      const result = await upsertAnnouncement(db, toAnnouncementRow(parsed));
+      expect(result).toBe("inserted");
+    }
+    expect(await db.announcements.count()).toBe(allValid.length);
+  });
+});
