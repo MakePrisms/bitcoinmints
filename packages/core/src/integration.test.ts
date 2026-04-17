@@ -27,7 +27,7 @@ import { createScheduler } from "./scheduler";
 
 type Fixture = {
   _meta: Record<string, unknown>;
-  cashu38172BotSpam: NostrEvent[];
+  cashu38172Curator: NostrEvent[];
   cashu38172Legacy: NostrEvent[];
   cashu38172SpecConforming: NostrEvent[];
   fedimint38173: NostrEvent[];
@@ -104,7 +104,7 @@ function toReviewRow(parsed: NonNullable<ReturnType<typeof parseRecommendation>>
  */
 async function replayCorpus(db: BitcoinmintsDB) {
   const all38172: NostrEvent[] = [
-    ...f.cashu38172BotSpam,
+    ...f.cashu38172Curator,
     ...f.cashu38172Legacy,
     ...f.cashu38172SpecConforming,
   ];
@@ -140,7 +140,7 @@ describe("integration: corpus replay → parse → cache", () => {
 
     // Sanity: every event in the corpus has a result entry.
     expect(announcementResults.length).toBe(
-      f.cashu38172BotSpam.length +
+      f.cashu38172Curator.length +
         f.cashu38172Legacy.length +
         f.cashu38172SpecConforming.length +
         f.fedimint38173.length,
@@ -152,41 +152,38 @@ describe("integration: corpus replay → parse → cache", () => {
     for (const r of announcementResults) expect(r.result).not.toBe("parse-failed");
     for (const r of reviewResults) expect(r.result).not.toBe("parse-failed");
 
-    // Per the fixture's _meta.notes:
-    //   "Accepted: all cashu38172Legacy + cashu38172SpecConforming.
-    //    Rejected: cashu38172BotSpam only."
-    // Plus all 3 Fedimint events bypass Layer A.
-    // Accepted = 1 (Legacy x-only) + 2 (SpecConforming compressed) + 3 (Fedimint) = 6
-    // Rejected by Layer A = 5 (bot-spam only).
-    const acceptedCashuLayerA = f.cashu38172Legacy.length + f.cashu38172SpecConforming.length;
+    // Per the fixture's _meta.notes (post-relaxation):
+    //   "Accepted: all cashu38172Curator + cashu38172Legacy + cashu38172SpecConforming."
+    // Plus all 3 Fedimint events pass their sibling 64-char hex gate.
+    // Accepted = 5 (Curator 16-char) + 1 (Legacy x-only) + 2 (SpecConforming compressed) + 3 (Fedimint) = 11
+    // Rejected by Layer A = 0 (all corpus d-tags are well-formed printable ASCII).
+    const acceptedCashuLayerA =
+      f.cashu38172Curator.length + f.cashu38172Legacy.length + f.cashu38172SpecConforming.length;
     const acceptedFedimint = f.fedimint38173.length;
     const expectedAccepted = acceptedCashuLayerA + acceptedFedimint;
-    const expectedRejected = f.cashu38172BotSpam.length;
-    expect(expectedAccepted).toBe(6);
-    expect(expectedRejected).toBe(5);
+    const expectedRejected = 0;
+    expect(expectedAccepted).toBe(11);
+    expect(expectedRejected).toBe(0);
 
     // Cache state assertions.
     expect(await db.announcements.count()).toBe(expectedAccepted);
 
-    // Result-stream assertions: every accepted event lands as 'inserted'
-    // (each has unique [pubkey,kind,d]); every bot-spam lands as
-    // 'rejected-invalid' (Layer A gate).
+    // Result-stream assertions: every event lands as 'inserted' post-relaxation
+    // (each has unique [pubkey,kind,d]); nothing rejected by Layer A.
     const inserted = announcementResults.filter((r) => r.result === "inserted");
     const rejectedInvalid = announcementResults.filter((r) => r.result === "rejected-invalid");
     expect(inserted.length).toBe(expectedAccepted);
     expect(rejectedInvalid.length).toBe(expectedRejected);
 
-    // Reviews: all 5 recommendations parse, but Layer A applies to the
-    // reviews' `d` tag too (PR #5) — 2 of the 5 point at 16-char legacy
-    // d-tags that pre-date the Cashu-mint-pubkey d-tag convention and
-    // would be indistinguishable from the bot-spam shape the gate is
-    // designed to reject. Those are `rejected-invalid`. The remaining 3
-    // reference real 64-char Cashu mint pubkeys and insert cleanly.
+    // Reviews: all 5 recommendations parse and all 5 insert post-relaxation.
+    // 2 point at 16-char curator d-tags (previously rejected as bot-spam);
+    // 3 point at 64-char pubkeys/federation-ids. URL + Layer B are the real
+    // verification gates now.
     const reviewsInserted = reviewResults.filter((r) => r.result === "inserted");
     const reviewsRejectedInvalid = reviewResults.filter((r) => r.result === "rejected-invalid");
-    expect(reviewsInserted.length).toBe(3);
-    expect(reviewsRejectedInvalid.length).toBe(2);
-    expect(await db.reviews.count()).toBe(3);
+    expect(reviewsInserted.length).toBe(5);
+    expect(reviewsRejectedInvalid.length).toBe(0);
+    expect(await db.reviews.count()).toBe(5);
   });
 
   it("the legacy Nostrodomo (64-char x-only) lands as inserted, not rejected-invalid", async () => {
@@ -275,29 +272,69 @@ describe("integration: CAS convergence under simulated multi-relay race", () => 
 });
 
 describe("integration: Layer A enforced at cache, not parser", () => {
-  it("bot-spam events parse successfully but are rejected by upsertAnnouncement", async () => {
-    // Pin the design choice: parser is lenient, the cache is the gate. This
-    // matters because downstream code (e.g. raw-event log, debugger views)
-    // can still see what came over the wire even if it never lands.
+  it("curator events parse successfully and are accepted post-relaxation", async () => {
+    // Pin the design choice: parser is lenient, the cache is the gate. Post-
+    // 2026-04-17 relaxation, curator-style 16-char d-tags are accepted — the
+    // URL + Layer B are the real verification gates. This test used to
+    // assert rejection; the browser audit showed the 16-char shape points
+    // at real mints. We keep the test as a spot-check that the cache gate
+    // still runs (just with a different verdict for this shape).
     const db = await freshDB();
     let parsedCount = 0;
-    let rejectedAtCacheCount = 0;
-    for (const e of f.cashu38172BotSpam) {
+    let acceptedCount = 0;
+    for (const e of f.cashu38172Curator) {
       const parsed = parseMintAnnouncement(e);
-      // Parser does NOT gate on Layer A — every bot-spam event parses fine.
       expect(parsed).not.toBeNull();
       if (!parsed) continue;
       parsedCount++;
-      // Bot-spam d-tags are 16-char random — regex doesn't match.
-      expect(isValidCashuDTag(parsed.d)).toBe(false);
+      // Curator d-tags are 16-char random printable ASCII — regex matches.
+      expect(isValidCashuDTag(parsed.d)).toBe(true);
       const result = await upsertAnnouncement(db, toAnnouncementRow(parsed));
-      // The cache is where Layer A bites.
-      expect(result).toBe("rejected-invalid");
-      rejectedAtCacheCount++;
+      expect(result).toBe("inserted");
+      acceptedCount++;
     }
-    expect(parsedCount).toBe(f.cashu38172BotSpam.length);
-    expect(rejectedAtCacheCount).toBe(f.cashu38172BotSpam.length);
-    // Nothing landed despite all 5 parsing successfully — design contract held.
+    expect(parsedCount).toBe(f.cashu38172Curator.length);
+    expect(acceptedCount).toBe(f.cashu38172Curator.length);
+    expect(await db.announcements.count()).toBe(f.cashu38172Curator.length);
+  });
+
+  it("the cache gate still rejects unambiguous garbage (empty / oversized / non-printable)", async () => {
+    // The Layer A gate is still live for the narrow cases that survive the
+    // relaxation. Constructing synthetic events rather than mining fixtures
+    // because the corpus intentionally doesn't carry junk d-tags.
+    const db = await freshDB();
+    const pubkey = "0".repeat(64);
+
+    // Empty d — rejected.
+    const emptyDEvent = { ...(f.cashu38172Curator[0] as NostrEvent) };
+    const emptyTags = (emptyDEvent.tags ?? []).map((t) => (t[0] === "d" ? ["d", ""] : t));
+    const emptyEvent: NostrEvent = { ...emptyDEvent, pubkey, tags: emptyTags };
+    const emptyParsed = parseMintAnnouncement(emptyEvent);
+    // parseMintAnnouncement currently returns null for missing/empty d —
+    // so the gate doesn't even get to run. That's fine; assert via a row
+    // we construct directly.
+    expect(emptyParsed).toBeNull();
+    const emptyRow = {
+      pubkey,
+      kind: 38172 as const,
+      d: "",
+      eventId: "e".repeat(64),
+      createdAt: 1_700_000_000,
+      u: ["https://mint.example"],
+      content: "",
+      rawTags: [] as string[][],
+      verifiedBySignerBinding: null,
+    };
+    expect(await upsertAnnouncement(db, emptyRow)).toBe("rejected-invalid");
+
+    // Oversized d — rejected.
+    const oversizedRow = { ...emptyRow, d: "a".repeat(257), eventId: "f".repeat(64) };
+    expect(await upsertAnnouncement(db, oversizedRow)).toBe("rejected-invalid");
+
+    // Non-printable d — rejected.
+    const nonPrintableRow = { ...emptyRow, d: "has\nnewline", eventId: "9".repeat(64) };
+    expect(await upsertAnnouncement(db, nonPrintableRow)).toBe("rejected-invalid");
+
     expect(await db.announcements.count()).toBe(0);
   });
 
@@ -420,7 +457,7 @@ function makeCorpusFetcher(): MintInfoFetcher {
  */
 async function pushCashuCorpus(pushEvent: (e: NostrEvent) => Promise<void>): Promise<void> {
   const allCashu: NostrEvent[] = [
-    ...f.cashu38172BotSpam,
+    ...f.cashu38172Curator,
     ...f.cashu38172Legacy,
     ...f.cashu38172SpecConforming,
   ];
@@ -440,30 +477,34 @@ describe("integration: scheduler full pipeline", () => {
     await pushCashuCorpus(pushEvent);
     await drainLayerB(sched);
 
-    // Stats: same accept/reject as the parse → cache integration above
-    // (5 bot-spam rejected at Layer A; 1 legacy + 2 spec-conforming + 3
-    // fedimint accepted = 6 announcements; 3 reviews accepted + 2 reviews
-    // rejected for 16-char legacy d-tags per PR #5's Layer A review gate).
+    // Stats post-relaxation: every corpus event has a well-formed d-tag,
+    // so Layer A rejects nothing. 11 announcements + 5 reviews = 16
+    // accepted. Layer B still distinguishes verified from failed.
     const stats = sched.getStats();
-    // 11 announcements (5 spam + 1 legacy + 2 spec + 3 fedi) + 5 reviews = 16.
+    // 11 announcements (5 curator + 1 legacy + 2 spec + 3 fedi) + 5 reviews = 16.
     expect(stats.eventsReceived).toBe(16);
-    // 5 announcement bot-spam rejections + 2 review 16-char d-tag rejections.
-    expect(stats.rejectedByLayerA).toBe(7);
-    // Accepted = 6 announcements + 3 reviews = 9.
-    expect(stats.accepted).toBe(9);
+    // No Layer A rejections — all corpus d-tags are well-formed printable ASCII.
+    expect(stats.rejectedByLayerA).toBe(0);
+    // Accepted = 11 announcements + 5 reviews = 16.
+    expect(stats.accepted).toBe(16);
 
-    // Layer B: spec-conforming Alpha + Beta verify. Legacy Nostrodomo
-    // returns ok but with the wrong pubkey → counts as failed. Fedimint
-    // is non-cashu and doesn't enqueue Layer B at all.
+    // Layer B: spec-conforming Alpha + Beta verify against the fetcher
+    // mapping. Legacy Nostrodomo (sharegap) returns pubkey-mismatch.
+    // Curator URLs (azzamo×2 / lnw / 21mint / cashu.boats) aren't in the
+    // fetcher mapping → 404 → all-fetches-failed (transient). Only 4
+    // distinct curator URLs exist in the fixture (azzamo appears twice);
+    // the second azzamo enqueue hits the per-URL backoff cooldown and
+    // short-circuits without running Layer B again, so only 4 curator
+    // attempts actually register. Fedimint is non-cashu and doesn't
+    // enqueue Layer B at all.
     expect(stats.layerBVerified).toBe(2);
-    expect(stats.layerBFailed).toBe(1);
+    expect(stats.layerBFailed).toBe(5);
     expect(stats.layerBPending).toBe(0);
 
-    // Cache state matches the parse → cache test exactly: 6 announcements,
-    // 3 reviews (2 more reviews rejected by PR #5's Layer A on reviews'
-    // d-tags). Bot-spam rejected at Layer A, never lands.
-    expect(await db.announcements.count()).toBe(6);
-    expect(await db.reviews.count()).toBe(3);
+    // Cache state: all 11 announcements land (5 curator + 1 legacy + 2 spec
+    // + 3 fedi). All 5 reviews insert post-relaxation.
+    expect(await db.announcements.count()).toBe(11);
+    expect(await db.reviews.count()).toBe(5);
 
     // Spot-check verifiedBySignerBinding wired through correctly.
     const alphaPubkey = "02aa00000000000000000000000000000000000000000000000000000000000001";
@@ -485,8 +526,10 @@ describe("integration: scheduler full pipeline", () => {
     expect(fedimintRow).toBeDefined();
     expect(fedimintRow?.verifiedBySignerBinding).toBeNull();
 
-    // mintInfo rows: 2 ok (Alpha, Beta) + 1 !ok (Legacy mismatch).
-    expect(await db.mintInfo.count()).toBe(3);
+    // mintInfo rows: 2 ok (Alpha, Beta) + 1 !ok (Legacy pubkey-mismatch)
+    // + 4 !ok (curator events — 4 distinct URLs, second azzamo skipped via
+    // backoff cooldown, so no row written for curator[2]).
+    expect(await db.mintInfo.count()).toBe(7);
     const alphaInfo = await db.mintInfo.get(alphaPubkey);
     expect(alphaInfo?.ok).toBe(true);
     expect(alphaInfo?.url).toBe("https://mint.alpha.test");
@@ -531,16 +574,24 @@ describe("integration: scheduler full pipeline", () => {
       mintInfo: await db.mintInfo.count(),
       fetches: calls1.length,
     };
-    expect(round1Counts.announcements).toBe(6);
-    // 3 reviews (2 more gated out by PR #5's Layer A on review d-tags).
-    expect(round1Counts.reviews).toBe(3);
-    expect(round1Counts.mintInfo).toBe(3);
+    // 11 announcements (5 curator + 1 legacy + 2 spec + 3 fedi).
+    expect(round1Counts.announcements).toBe(11);
+    // 5 reviews post-relaxation (curator d-tags accepted).
+    expect(round1Counts.reviews).toBe(5);
+    // 2 verified ok + 1 legacy pubkey-mismatch + 4 curator 404 rows
+    // (second azzamo skipped via backoff cooldown, no row written).
+    expect(round1Counts.mintInfo).toBe(7);
 
     // Round 2 — fresh scheduler against same DB. createScheduler reads
     // the watermarks from the cache; the corpus replay uses the same
     // events (same createdAt), so every announcement upsert lands as
-    // 'rejected-stale' (next.createdAt is NOT > prev.createdAt) which
-    // means Layer B is not re-enqueued, so calls2 stays at 0.
+    // 'rejected-stale' (next.createdAt is NOT > prev.createdAt). On
+    // startup, reenqueueUnverified finds rows with
+    // verifiedBySignerBinding === null (the 5 curator events whose
+    // Layer B hit 404 = all-fetches-failed = transient) and re-enqueues
+    // them — so calls2 will have the 5 curator URLs re-fetched. The
+    // alpha/beta (verified=true) and legacy (verified=false, pubkey-
+    // mismatch) rows are NOT re-enqueued.
     const { pool: pool2, pushEvent: push2 } = makeFakePool();
     const calls2: string[] = [];
     const fetcher2: MintInfoFetcher = (url) => {
@@ -558,14 +609,35 @@ describe("integration: scheduler full pipeline", () => {
     await drainLayerB(sched2);
     await sched2.stop();
 
-    // Same row counts — no duplicates introduced by the replay.
+    // Same announcement + review counts — no duplicates introduced by replay.
     expect(await db.announcements.count()).toBe(round1Counts.announcements);
     expect(await db.reviews.count()).toBe(round1Counts.reviews);
-    expect(await db.mintInfo.count()).toBe(round1Counts.mintInfo);
+    // MintInfo may grow by one on round 2: round 1 streams events sequentially
+    // so the per-URL backoff short-circuits the second `mint.azzamo.net`
+    // attempt; round 2's reenqueueUnverified bulk-enqueues all 5 curator
+    // rows before any completes, so both azzamo attempts race through and
+    // the second row lands too. Both outcomes are correct — pin a permissive
+    // bound rather than the exact count.
+    expect(await db.mintInfo.count()).toBeGreaterThanOrEqual(round1Counts.mintInfo);
+    expect(await db.mintInfo.count()).toBeLessThanOrEqual(round1Counts.mintInfo + 1);
 
-    // No second-round Layer B fetches: each 'rejected-stale' upsert short-
-    // circuits the enqueue path.
-    expect(calls2.length).toBe(0);
+    // Round-2 Layer B re-fetches come only from the transient-null curator
+    // rows being re-enqueued at startup — alpha/beta (verified) and legacy
+    // (pubkey-mismatch = real failure) aren't re-enqueued.
+    const curatorUrls = new Set([
+      "https://mint.azzamo.net",
+      "https://mint.lnw.cash",
+      "https://21mint.me",
+      "https://cashu.boats",
+    ]);
+    const curatorCalls = calls2.filter((u) => curatorUrls.has(u));
+    // 5 curator announcements but only 4 distinct URLs (azzamo appears
+    // twice). Each re-enqueued row fetches its `u[]` once → 5 calls.
+    expect(curatorCalls.length).toBeGreaterThanOrEqual(4);
+    // No alpha/beta/sharegap re-fetches — verdicts were terminal.
+    expect(calls2.some((u) => u.includes("mint.alpha.test"))).toBe(false);
+    expect(calls2.some((u) => u.includes("mint.beta.test"))).toBe(false);
+    expect(calls2.some((u) => u.includes("sharegap"))).toBe(false);
 
     // Verification status preserved across restart (PR #29 fix on the
     // cache + scheduler not clobbering on replace).
