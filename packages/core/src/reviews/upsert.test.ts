@@ -36,8 +36,7 @@ async function freshDB(): Promise<BitcoinmintsDB> {
 }
 
 const D_VALID = "5fe928ae0970844f3c5253d2e85a88788486edcbd96c070334a4a2d0d0154a77";
-const D_CURATOR = "psvef0yh2zk24tt7"; // 16-char curator shape — now valid post-relaxation.
-const D_EMPTY = ""; // Empty d-tag — still rejected as unambiguous garbage.
+const D_BOT = "psvef0yh2zk24tt7"; // 16-char legacy/bot-spam shape.
 
 const EID_LOW = `${"0".repeat(60)}aaaa`;
 const EID_HIGH = `${"0".repeat(60)}ffff`;
@@ -229,27 +228,17 @@ describe("upsertReviewWithAggregate — concurrent CAS + aggregate race", () => 
 });
 
 describe("upsertReviewWithAggregate — Layer A gate", () => {
-  it("16-char curator-style d-tag → inserted post-relaxation (was rejected pre-2026-04-17)", async () => {
-    // Per the Layer A relaxation: curator-style d-tags are legitimate
-    // pointers at real mints. URL + Layer B are the real gates.
+  it("16-char bot-spam d-tag → rejected-invalid, no review row, no aggregate row", async () => {
     const db = await freshDB();
-    const result = await upsertReviewWithAggregate(db, makeReview({ d: D_CURATOR }));
-    expect(result).toBe("inserted");
-    expect(await db.reviews.count()).toBe(1);
-    expect(await db.mintAggregate.count()).toBe(1);
-  });
-
-  it("empty d-tag → still rejected-invalid (unambiguous garbage)", async () => {
-    const db = await freshDB();
-    const result = await upsertReviewWithAggregate(db, makeReview({ d: D_EMPTY }));
+    const result = await upsertReviewWithAggregate(db, makeReview({ d: D_BOT }));
     expect(result).toBe("rejected-invalid");
     expect(await db.reviews.count()).toBe(0);
     expect(await db.mintAggregate.count()).toBe(0);
   });
 
-  it("Fedimint k=38173 review with a valid 64-char federation id passes the sibling gate", async () => {
+  it("Fedimint k=38173 review with non-regex d bypasses the gate", async () => {
     const db = await freshDB();
-    // The Fedimint gate is unchanged by the Cashu relaxation — still 64-char hex.
+    // A federation ID isn't constrained by the Cashu-mint-pubkey regex.
     const fediRow = makeReview({
       d: "718e421be177486639330d198e870b7345ebd07b2866b5fd3797d73e4bc4c9af",
       k: 38173,

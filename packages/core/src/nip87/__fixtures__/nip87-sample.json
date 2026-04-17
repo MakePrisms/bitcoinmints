@@ -5,15 +5,15 @@
     "snapshot": "2026-04-16",
     "notes": [
       "Events are real, collected in the 2026-04-16 relay survey.",
-      "The 5 cashu38172Curator events share pubkey 972f233a... and use random 16-char d-tags. Originally filed as 'bot spam' based on the 2025-02-13 burst documented in audit/relay-strategy-v1.md §4; the 2026-04-17 browser audit of 500 on-wire events showed 99.8% of kind:38172 events on nos.lol use this exact shape pointing at legitimate operational mints (mint.coinos.io, stablenut.umint.cash, cashu.boats, mint.lnvoltz.com, etc). The shape is a non-spec curator convention, not bot spam; the URL is the mint's identity, not the d-tag.",
-      "The 1 cashu38172Legacy event (Nostrodomo Mint) uses a 64-char x-only secp256k1 pubkey d-tag. The 'Legacy' bucket name is preserved for continuity, but empirically this IS NOT the mainstream shape — the 16-char curator form dominates the wild.",
-      "Layer A regex relaxed (PR #32 follow-up, 2026-04-17) to accept any non-empty printable-ASCII d-tag up to 256 chars. Accepted: all cashu38172Curator + cashu38172Legacy + cashu38172SpecConforming. URL + Layer B are the real verification gates.",
+      "The 5 cashu38172BotSpam events share pubkey 972f233a... and use random 16-char d-tags — part of the 959-event 2025-02-13 burst documented in audit/relay-strategy-v1.md §4.",
+      "The 1 cashu38172Legacy event (Nostrodomo Mint) uses a 64-char x-only secp256k1 pubkey d-tag. The 'Legacy' bucket name is preserved for continuity, but empirically this IS the de-facto mainstream shape every real Cashu mint in the wild publishes — NOT a legacy minority form.",
+      "Layer A regex relaxed to accept 64-char x-only (empirical fix — no real mints use 66-char compressed in the wild). 16-char bot-spam d-tags still rejected. Accepted: all cashu38172Legacy + cashu38172SpecConforming. Rejected: cashu38172BotSpam only.",
       "The 2 cashu38172SpecConforming events are SYNTHETIC: real mint URLs + contentMetadata, but the d-tag is rewritten to a valid 66-char compressed secp256k1 pubkey (derived by prefixing real mint pubkeys with 02/03). Their sig field is intentionally invalid (we do not re-sign) and the id does not match tag contents — parse layer does not verify signatures or event ids.",
-      "Fedimint events are real and filtered to ones that include at least one u tag (required by the parser). Layer A for kind:38173 still enforces the 64-char hex federation-id shape via FEDIMINT_D_TAG_REGEX.",
+      "Fedimint events are real and filtered to ones that include at least one u tag (required by the parser). Layer A does not apply to kind:38173 — federation-id shape is TODO-v1.1.",
       "Recommendations span three rating formats plus a no-rating case."
     ]
   },
-  "cashu38172Curator": [
+  "cashu38172BotSpam": [
     {
       "content": "{\"url\":\"https://mint.azzamo.net\",\"name\":\"Azzamo Cashu Mint\",\"description\":\"Unlock a new dimension of digital transactions with Azzamo cash Mint.\",\"version\":\"Nutshell/0.16.4\",\"nuts\":[\"NUT-07\",\"NUT-08\",\"NUT-09\"],\"motd\":\"Disclaimer: Azzamo Mint is in beta and experimental. Use small amounts only. Key Mantra: Not your keys = Not your coins.\",\"contact\":[[\"email\",\"support@azzamo.net\"],[\"twitter\",\"@me\"],[\"nostr\",\"npub...\"]]}",
       "created_at": 1739410455,
