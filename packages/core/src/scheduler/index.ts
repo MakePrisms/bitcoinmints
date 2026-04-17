@@ -63,6 +63,7 @@
  *     events are dropped at the pool boundary (per PR #2 fix).
  */
 
+import Dexie from "dexie";
 import type { Event as NostrEvent } from "nostr-tools/core";
 import {
   type AnnouncementRow,
@@ -130,6 +131,33 @@ const SUBSCRIBED_KINDS = [38172, 38173, 38000, 0, 10002] as const;
 const BASE_BACKOFF_MS = 30_000;
 /** Cap at 1 hour. */
 const MAX_BACKOFF_MS = 60 * 60_000;
+
+/**
+ * How far into the future a relay event's `created_at` is allowed to advance
+ * the watermark. Wallets with skewed clocks emit events a few minutes ahead;
+ * a malicious or buggy event with `created_at` in the year 3000 would
+ * otherwise poison the in-memory watermark and silently filter all
+ * subsequent legitimate events on the wire (see gap #19 / silent-failure
+ * analysis). 10 minutes is the standard NIP-01 clock-skew tolerance.
+ */
+const WATERMARK_FUTURE_SLACK_SEC = 600;
+
+/**
+ * Hard ceiling on a single Layer B verification attempt. The fetcher's
+ * per-URL timeout is 5s; with up to ~3 URLs and a touch of slack for
+ * transaction overhead, 30s is the wall-clock budget. Past this, the task
+ * is treated as a transient failure (verifiedBySignerBinding stays null
+ * for retry) so a stuck mint can't pin a worker.
+ */
+const LAYER_B_TASK_TIMEOUT_MS = 30_000;
+
+/**
+ * Max number of unverified rows we re-enqueue at startup to avoid restart
+ * storms when a long-down mint comes back. The remainder will be picked up
+ * by the regular onEvent path on the next replay or via a future periodic
+ * sweep (deferred).
+ */
+const RESTART_REENQUEUE_CAP = 100;
 
 /**
  * State per mint URL we've attempted Layer B against. Used to throttle
@@ -258,9 +286,18 @@ export function createScheduler(config: SchedulerConfig): Scheduler {
   // filter on next start(). Not persisted — the cache is the durable
   // record and we re-derive on restart.
   const watermarks = new Map<number, number>();
+  /**
+   * Advance the in-memory watermark for a kind, clamping to
+   * `now + WATERMARK_FUTURE_SLACK_SEC`. The clamp prevents a junk event
+   * with `created_at` far in the future from poisoning the watermark — if
+   * we trust it verbatim, that watermark would persist (via re-derivation
+   * from `max(createdAt)` on restart) and silently filter all subsequent
+   * legitimate events that arrive with a smaller `created_at`.
+   */
   const updateWatermark = (kind: number, createdAt: number) => {
+    const safeTs = Math.min(createdAt, Math.floor(now() / 1000) + WATERMARK_FUTURE_SLACK_SEC);
     const prev = watermarks.get(kind) ?? 0;
-    if (createdAt > prev) watermarks.set(kind, createdAt);
+    if (safeTs > prev) watermarks.set(kind, safeTs);
   };
 
   // Per-URL backoff state. Keyed by the canonical mint URL string from the
@@ -287,15 +324,22 @@ export function createScheduler(config: SchedulerConfig): Scheduler {
    * the highest `createdAt` we've already accepted and use that as the
    * floor. Tables that don't store the kind explicitly use the natural
    * one (profiles=0, relayLists=10002).
+   *
+   * Uses the v2 compound index `[kind+createdAt]` on announcements so the
+   * per-kind lookup is bounded (`.last()` of a range scan) rather than
+   * materializing the whole table via .sortBy(). The restored value is
+   * fed through `updateWatermark` which applies the future-slack clamp,
+   * so a poisoned event in the cache can't re-poison the in-memory
+   * watermark on restart.
    */
   async function restoreWatermarks(): Promise<void> {
-    // Announcements: 38172 + 38173 — index on `kind` lets us scan per kind.
+    // Announcements: 38172 + 38173 — bounded scan via compound index.
     for (const k of [38172, 38173] as const) {
-      const top = await db.announcements.where("kind").equals(k).reverse().sortBy("createdAt");
-      if (top.length > 0) {
-        const first = top[0];
-        if (first) updateWatermark(k, first.createdAt);
-      }
+      const last = await db.announcements
+        .where("[kind+createdAt]")
+        .between([k, Dexie.minKey], [k, Dexie.maxKey])
+        .last();
+      if (last) updateWatermark(k, last.createdAt);
     }
     // Reviews are all kind 38000 — same idea, no `where` filter needed.
     const review = await db.reviews.orderBy("createdAt").reverse().limit(1).first();
@@ -304,6 +348,71 @@ export function createScheduler(config: SchedulerConfig): Scheduler {
     if (profile) updateWatermark(0, profile.createdAt);
     const relayList = await db.relayLists.orderBy("createdAt").reverse().limit(1).first();
     if (relayList) updateWatermark(10002, relayList.createdAt);
+  }
+
+  /**
+   * On startup, find announcements that were accepted but never had Layer B
+   * complete (verifiedBySignerBinding === null) and re-enqueue them. Without
+   * this, a row that was inserted before a Layer B failure (or before a
+   * crash) sits in the cache forever as "not yet verified" and the UI
+   * shows no badge. Capped at RESTART_REENQUEUE_CAP to avoid restart storms
+   * if a long-down mint comes back. Only kinds 38172 (Cashu) qualify —
+   * 38173 (Fedimint) has no Layer B by design.
+   *
+   * We collect the candidate rows under a READ transaction first, then
+   * enqueue them OUTSIDE that transaction. Calling enqueueLayerB while
+   * still inside the .each() callback would schedule runLayerB's `rw`
+   * transaction as a child of Dexie's currently-open `r` transaction
+   * (Dexie auto-binds via zone-tracked promise chains), which fails with
+   * SubTransactionError.
+   */
+  async function reenqueueUnverified(): Promise<void> {
+    const candidates: AnnouncementRow[] = [];
+    let truncated = false;
+    await db.announcements
+      .where("kind")
+      .anyOf([38172])
+      .filter((r) => r.verifiedBySignerBinding === null)
+      .until(() => candidates.length >= RESTART_REENQUEUE_CAP)
+      .each((row) => {
+        if (candidates.length >= RESTART_REENQUEUE_CAP) {
+          truncated = true;
+          return;
+        }
+        candidates.push(row);
+      });
+    // Outside the transaction now — safe to start `rw` work.
+    for (const row of candidates) enqueueLayerB(row);
+    if (truncated) {
+      // Best-effort signal to operators that the cap kicked in. console
+      // is the right surface here — we don't have a structured logger
+      // wired through yet (deferred to ingest-stats UI work).
+      console.warn(
+        `[scheduler] reenqueueUnverified hit RESTART_REENQUEUE_CAP=${RESTART_REENQUEUE_CAP}; remaining unverified rows will be retried on next replay`,
+      );
+    }
+  }
+
+  /**
+   * Map a LayerBResult to the value we persist on the announcement row.
+   *
+   *   - verified=true                       → true   (real positive verdict)
+   *   - verified=false, all-fetches-failed  → null   (transient — re-try later)
+   *   - verified=false, pubkey-mismatch     → false  (real negative verdict)
+   *   - verified=false, anything else       → null   (defensive — treat as transient)
+   *
+   * Without this mapping, a transient `all-fetches-failed` would write
+   * `verifiedBySignerBinding: false` and the row would carry a permanent
+   * negative verdict for what was actually just a temporary network issue
+   * (silent-failure gap).
+   */
+  function verdictForPersistence(result: LayerBResult): boolean | null {
+    if (result.verified) return true;
+    // Treat pubkey-mismatch as a real verdict; everything else is transient.
+    if (typeof result.reason === "string" && result.reason.startsWith("pubkey-mismatch")) {
+      return false;
+    }
+    return null;
   }
 
   /**
@@ -331,15 +440,26 @@ export function createScheduler(config: SchedulerConfig): Scheduler {
 
     let result: LayerBResult;
     try {
-      result = await verifySignerBinding(row, fetcher);
+      // Per-task timeout: cap the total wall-clock for one Layer B attempt.
+      // The fetcher has a per-URL timeout (5s default), but a row with
+      // many URLs or a fetcher that gets stuck on a single hung promise
+      // could still pin a worker indefinitely. On timeout we map to
+      // `all-fetches-failed` so the row stays null/transient and gets
+      // retried later (verdictForPersistence above).
+      result = await Promise.race<LayerBResult>([
+        verifySignerBinding(row, fetcher),
+        new Promise<LayerBResult>((_, reject) => {
+          setTimeout(() => reject(new Error("layer-b-timeout")), LAYER_B_TASK_TIMEOUT_MS);
+        }),
+      ]);
     } catch (err) {
-      // Defensive: verifySignerBinding shouldn't throw (the fetcher
-      // contract resolves to MintInfoResult), but if it does we treat it
-      // as a Layer B failure and back off.
-      result = {
-        verified: false,
-        reason: `verifier-threw: ${err instanceof Error ? err.message : String(err)}`,
-      };
+      // Either a thrown verifier (defensive — verifySignerBinding shouldn't
+      // throw given the fetcher contract) or our timeout. Either way, we
+      // treat it as a transient failure so the row gets retried.
+      const message = err instanceof Error ? err.message : String(err);
+      const reason =
+        message === "layer-b-timeout" ? "all-fetches-failed" : `verifier-threw: ${message}`;
+      result = { verified: false, reason };
     }
 
     // Update backoff state per URL. Success clears it; failure increments.
@@ -355,43 +475,77 @@ export function createScheduler(config: SchedulerConfig): Scheduler {
       }
     }
 
-    // Persist verification result on the announcement row. The CAS upsert
-    // will preserve a prior `true`/`false` if a newer event raced past us
-    // (PR #29 fix); a fresh `verifiedBySignerBinding` setting always wins
-    // on the first verify because the prior is null.
-    const existing = await db.announcements.get([row.pubkey, row.kind, row.d]);
-    if (existing) {
-      // Direct put bypasses CAS — we're updating one specific field on a
-      // row we own. CAS is for replaceable-event ordering; this is local
-      // bookkeeping. The upsertAnnouncement preserve-Layer-B logic only
-      // matters when a newer event arrives AFTER Layer B has run.
-      await db.announcements.put({
-        ...existing,
-        verifiedBySignerBinding: result.verified,
-      });
-    }
+    const verdict = verdictForPersistence(result);
+    // The matched URL — present only on success — is what we write into
+    // MintInfoRow. On failure we fall back to u[0] for the diagnostic row
+    // (the UI uses it as a label, no further fetches happen against it).
+    const persistedUrl = result.verified ? result.url : (row.u[0] ?? "");
 
-    // Persist /v1/info into the mintInfo table. This avoids the second
-    // round-trip on the UI's mint-detail view (data-model-v1.md §7).
-    if (result.verified && result.info) {
-      await upsertMintInfo(db, {
-        d: row.d,
-        url: row.u[0] ?? "",
-        fetchedAt: now(),
-        infoJson: result.info as unknown as Record<string, unknown>,
-        ok: true,
+    // Persist verification result on the announcement row in a transaction
+    // that re-checks the row's eventId before writing. This prevents a
+    // newer event that landed mid-Layer-B from being clobbered by a
+    // stale spread of the snapshot we read before the verify started.
+    //
+    // Race shape we're guarding against (gap #22):
+    //   1. We read `existing` at createdAt=100.
+    //   2. onEvent fires for a newer event at createdAt=200, upsert
+    //      replaces the row.
+    //   3. We `put({ ...existing, verifiedBySignerBinding })`, which
+    //      re-spreads the createdAt=100 snapshot and clobbers the
+    //      newer row.
+    //
+    // Inside the transaction we re-fetch and assert `existing.eventId`
+    // still matches `row.eventId`. If it doesn't, the row was replaced
+    // mid-flight; we drop both the announcement update AND the MintInfoRow
+    // upsert (the new row will be re-enqueued by onEvent's normal accept
+    // path).
+    let didPersistAnnouncement = false;
+    await db.transaction("rw", db.announcements, async () => {
+      const current = await db.announcements.get([row.pubkey, row.kind, row.d]);
+      if (!current) return;
+      if (current.eventId !== row.eventId) {
+        // A newer event raced past us. Don't clobber it — drop the
+        // verification result. The replacement will get its own Layer B
+        // pass via the normal onEvent path.
+        return;
+      }
+      // Write only the field we own. No `...current` spread — we're not
+      // shipping a stale snapshot of fields we don't intend to change,
+      // and that means future field additions don't risk silent regression.
+      await db.announcements.update([row.pubkey, row.kind, row.d], {
+        verifiedBySignerBinding: verdict,
       });
-    } else {
-      // Failure case: write a !ok row so the UI can show a "verification
-      // failed: $reason" badge without re-running Layer B itself.
-      await upsertMintInfo(db, {
-        d: row.d,
-        url: row.u[0] ?? "",
-        fetchedAt: now(),
-        infoJson: {},
-        ok: false,
-        lastError: result.reason ?? "unknown",
-      });
+      didPersistAnnouncement = true;
+    });
+
+    // Persist /v1/info into the mintInfo table. Only do this if the
+    // announcement update went through (i.e. this Layer B pass was for
+    // the row that's still current). upsertMintInfo opens its own
+    // transaction, so it must run outside the announcement-only tx
+    // above (Dexie disallows promoting a sub-transaction to a different
+    // table list). The MintInfoRow CAS predicate is fetchedAt, so even
+    // if a newer Layer B pass races us here, the higher fetchedAt wins.
+    if (didPersistAnnouncement) {
+      if (result.verified) {
+        await upsertMintInfo(db, {
+          d: row.d,
+          url: persistedUrl,
+          fetchedAt: now(),
+          infoJson: result.info as unknown as Record<string, unknown>,
+          ok: true,
+        });
+      } else {
+        // Failure case: write a !ok row so the UI can show a "verification
+        // failed: $reason" badge without re-running Layer B itself.
+        await upsertMintInfo(db, {
+          d: row.d,
+          url: persistedUrl,
+          fetchedAt: now(),
+          infoJson: {},
+          ok: false,
+          lastError: result.reason ?? "unknown",
+        });
+      }
     }
 
     if (result.verified) {
@@ -501,6 +655,20 @@ export function createScheduler(config: SchedulerConfig): Scheduler {
         } catch {
           // Best-effort restore — proceed with empty watermarks if cache
           // read fails. The CAS on writes is the correctness gate.
+        }
+        if (stopped) {
+          starting = false;
+          return;
+        }
+        // Re-enqueue rows that were accepted but never had Layer B
+        // complete (e.g. because the previous run crashed mid-fetch or a
+        // mint was down at the time). Without this, the row sits in the
+        // cache forever as "not yet verified" — the UI shows no badge and
+        // we never re-try.
+        try {
+          await reenqueueUnverified();
+        } catch {
+          // Best-effort — same rationale as the watermark restore above.
         }
         if (stopped) {
           starting = false;
