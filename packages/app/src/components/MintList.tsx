@@ -11,13 +11,22 @@ import { MintRow } from "./MintRow";
 
 /**
  * The whole list surface for PR #6 — spec is raw field dump per mint,
- * sorted by `bayesianScore` DESC via `rankMints(db, 50)`. We pair each
- * aggregate with its announcement row via a `useLiveQuery` per row (see
- * MintRow); the join stays naive per the brief ("keep the join naive — a
- * per-row useLiveQuery for mintInfo is fine for v1").
+ * sorted by `bayesianScore` DESC via `rankMints(db, 50)`.
+ *
+ * Join strategy: one unified `useLiveQuery` at this level pre-joins
+ * aggregate → announcement → mintInfo and hands `<MintRow>` fully-resolved
+ * props. Previously we had a per-row `useLiveQuery` which resolved a
+ * microtask after the aggregate query, causing a ~1s "(no announcement)"
+ * placeholder flash on reload. Single query kills the flash.
  */
 type Props = {
   db: BitcoinmintsDB;
+};
+
+type JoinedRow = {
+  aggregate: MintAggregateRow;
+  announcement: AnnouncementRow | undefined;
+  info: MintInfoRow | undefined;
 };
 
 export function MintList({ db }: Props): JSX.Element {
@@ -26,8 +35,24 @@ export function MintList({ db }: Props): JSX.Element {
   // lag behind `announcements` — that's intentional. PR #7 will decide
   // whether to render un-reviewed announcements as a tail section; for
   // the X-ray we follow the ranked-aggregate-as-truth posture.
-  const aggregates = useLiveQuery<MintAggregateRow[], MintAggregateRow[]>(
-    () => rankMints(db, 50),
+  const rows = useLiveQuery<JoinedRow[], JoinedRow[]>(
+    async () => {
+      const aggregates = await rankMints(db, 50);
+      const ds = aggregates.map((a) => a.d);
+      const announcements = await db.announcements.where("d").anyOf(ds).toArray();
+      const infos = await db.mintInfo.bulkGet(ds);
+      // A single `d` CAN map to multiple announcements (different pubkeys).
+      // Map.set keeps whichever appears LAST in `toArray()`; that matches
+      // the previous per-row `.first()` behavior only by luck-of-insert-order.
+      // PR #7 will resolve the ambiguity properly.
+      const annByD = new Map(announcements.map((a) => [a.d, a]));
+      // bulkGet returns an array in the same order as the keys; index align.
+      return aggregates.map((agg, i) => ({
+        aggregate: agg,
+        announcement: annByD.get(agg.d),
+        info: infos[i],
+      }));
+    },
     [db],
     [],
   );
@@ -35,7 +60,7 @@ export function MintList({ db }: Props): JSX.Element {
   // Empty state per spec: stats block still renders (that's in App.tsx),
   // the `mints` header always renders, and if there's nothing to show the
   // single line `no mints yet` sits below it.
-  if (aggregates.length === 0) {
+  if (rows.length === 0) {
     return (
       <>
         <div>mints</div>
@@ -47,43 +72,15 @@ export function MintList({ db }: Props): JSX.Element {
   return (
     <>
       <div>mints</div>
-      {aggregates.map((agg, i) => (
-        <MintRowWithLookup
-          key={agg.d}
-          db={db}
-          aggregate={agg}
-          isLast={i === aggregates.length - 1}
+      {rows.map((row, i) => (
+        <MintRow
+          key={row.aggregate.d}
+          aggregate={row.aggregate}
+          announcement={row.announcement}
+          info={row.info}
+          isLast={i === rows.length - 1}
         />
       ))}
     </>
   );
-}
-
-/**
- * Thin wrapper that joins aggregate → announcement → mintInfo via the
- * live-query hook. Announcement is queried by `d` (first match wins;
- * NIP-01 replaceable semantics mean there's only one current row per
- * [pubkey, kind, d], but a single d-tag CAN appear for multiple pubkeys
- * in-the-wild — PR #7 will surface that ambiguity properly, for now we
- * render whichever comes out of the index).
- */
-function MintRowWithLookup({
-  db,
-  aggregate,
-  isLast,
-}: {
-  db: BitcoinmintsDB;
-  aggregate: MintAggregateRow;
-  isLast: boolean;
-}): JSX.Element {
-  const announcement = useLiveQuery<AnnouncementRow | undefined>(
-    () => db.announcements.where("d").equals(aggregate.d).first(),
-    [db, aggregate.d],
-  );
-  const info = useLiveQuery<MintInfoRow | undefined>(
-    () => db.mintInfo.get(aggregate.d),
-    [db, aggregate.d],
-  );
-
-  return <MintRow aggregate={aggregate} announcement={announcement} info={info} isLast={isLast} />;
 }
