@@ -6,7 +6,7 @@ import { parseMintAnnouncement, parseRecommendation } from "./parse";
 
 type Fixture = {
   _meta: Record<string, unknown>;
-  cashu38172BotSpam: NostrEvent[];
+  cashu38172Curator: NostrEvent[];
   cashu38172Legacy: NostrEvent[];
   cashu38172SpecConforming: NostrEvent[];
   fedimint38173: NostrEvent[];
@@ -21,14 +21,14 @@ const f = fixtures as unknown as Fixture;
  */
 describe("NIP-87 corpus", () => {
   it("has the expected event counts per bucket", () => {
-    expect(f.cashu38172BotSpam.length).toBe(5);
+    expect(f.cashu38172Curator.length).toBe(5);
     expect(f.cashu38172Legacy.length).toBe(1);
     expect(f.cashu38172SpecConforming.length).toBe(2);
     expect(f.fedimint38173.length).toBe(3);
     expect(f.recommendations38000.length).toBe(5);
 
     const total =
-      f.cashu38172BotSpam.length +
+      f.cashu38172Curator.length +
       f.cashu38172Legacy.length +
       f.cashu38172SpecConforming.length +
       f.fedimint38173.length +
@@ -36,9 +36,9 @@ describe("NIP-87 corpus", () => {
     expect(total).toBe(16);
   });
 
-  it("Layer A accepts spec-conforming AND x-only Cashu announcements, rejects bot spam", () => {
+  it("Layer A accepts all Cashu announcements post-relaxation (curator + legacy + spec-conforming)", () => {
     const all38172: NostrEvent[] = [
-      ...f.cashu38172BotSpam,
+      ...f.cashu38172Curator,
       ...f.cashu38172Legacy,
       ...f.cashu38172SpecConforming,
     ];
@@ -53,27 +53,32 @@ describe("NIP-87 corpus", () => {
     const accepted = parsed.filter((a) => isValidCashuDTag(a.d));
     const rejected = parsed.filter((a) => !isValidCashuDTag(a.d));
 
-    // 2 SpecConforming (66-char compressed) + 1 Legacy (64-char x-only) = 3 accepted.
-    expect(accepted.length).toBe(3);
-    // 5 bot-spam (16-char random) = 5 rejected.
-    expect(rejected.length).toBe(5);
+    // All 8 accepted post-relaxation: 5 curator (16-char) + 1 legacy (64-char)
+    // + 2 spec-conforming (66-char). Rejection is reserved for empty / oversized
+    // / non-printable garbage, none of which appear in the corpus.
+    expect(accepted.length).toBe(8);
+    expect(rejected.length).toBe(0);
   });
 
-  it("Layer A rejects all 5 bot-spam events (16-char d-tags)", () => {
-    for (const e of f.cashu38172BotSpam) {
+  it("Layer A accepts all 5 curator events (16-char d-tags are legitimate)", () => {
+    for (const e of f.cashu38172Curator) {
       const parsed = parseMintAnnouncement(e);
       expect(parsed).not.toBeNull();
-      expect(parsed && isValidCashuDTag(parsed.d)).toBe(false);
+      expect(parsed && isValidCashuDTag(parsed.d)).toBe(true);
+      // Sanity: the curator shape really is 16 chars.
+      expect(parsed?.d.length).toBe(16);
     }
   });
 
-  it("all bot-spam events in the fixture belong to the 972f233a... publisher", () => {
-    const BOT_PUBKEY = "972f233aa467bc9804032c0bce0a117daead5473c56c91e811a216bdd08c08cf";
-    const botPubkeyCount = f.cashu38172BotSpam.filter((e) => e.pubkey === BOT_PUBKEY).length;
-    expect(botPubkeyCount).toBe(5);
+  it("all curator events in the fixture belong to the 972f233a... publisher", () => {
+    const CURATOR_PUBKEY = "972f233aa467bc9804032c0bce0a117daead5473c56c91e811a216bdd08c08cf";
+    const curatorPubkeyCount = f.cashu38172Curator.filter(
+      (e) => e.pubkey === CURATOR_PUBKEY,
+    ).length;
+    expect(curatorPubkeyCount).toBe(5);
   });
 
-  it("Layer A accepts the 64-char x-only Nostrodomo announcement (de-facto mainstream shape)", () => {
+  it("Layer A accepts the 64-char x-only Nostrodomo announcement", () => {
     for (const e of f.cashu38172Legacy) {
       const parsed = parseMintAnnouncement(e);
       expect(parsed).not.toBeNull();
@@ -83,7 +88,7 @@ describe("NIP-87 corpus", () => {
     }
   });
 
-  it("Layer A does NOT apply to Fedimint — all 3 parse, at least one has modules", () => {
+  it("Fedimint still uses its own (stricter) shape gate — unchanged by the Cashu relaxation", () => {
     const parsedFedi = f.fedimint38173
       .map((e) => parseMintAnnouncement(e))
       .filter((a): a is NonNullable<typeof a> => a !== null);
@@ -97,8 +102,8 @@ describe("NIP-87 corpus", () => {
         expect(Array.isArray(parsed.modules)).toBe(true);
         expect(parsed.modules.length).toBeGreaterThan(0);
       }
-      // TODO-v1.1: Fedimint d-tag is a federation id — no Layer A equivalent
-      // yet. We deliberately do NOT call isValidCashuDTag on Fedimint events.
+      // Intentionally don't call isValidCashuDTag on Fedimint events — the
+      // cashu regex isn't semantically applicable.
     }
 
     // At least one of the curated fixtures should have modules populated.

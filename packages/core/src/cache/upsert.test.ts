@@ -183,16 +183,47 @@ describe("upsertAnnouncement", () => {
     expect(fetched?.eventId).toBe(EID_HIGH);
   });
 
-  it("rejects as invalid when kind:38172 has a 16-char bot-spam d-tag", async () => {
+  it("accepts kind:38172 with a 16-char curator-style d-tag (post-relaxation)", async () => {
+    // Pre-2026-04-17 this was a 'rejected-invalid' assertion. The browser
+    // audit showed 99.8% of on-wire kind:38172 events use this exact
+    // shape pointing at legitimate mints — the URL is the identity, not
+    // the d-tag. Layer A now only rejects empty / oversized / non-printable.
     const db = await freshDB();
-    const bot = makeAnnouncement({ d: "abc123def4567890" });
+    const curator = makeAnnouncement({ d: "abc123def4567890" });
 
-    const result = await upsertAnnouncement(db, bot);
+    const result = await upsertAnnouncement(db, curator);
+    expect(result).toBe("inserted");
+    expect(await db.announcements.count()).toBe(1);
+  });
+
+  it("still rejects kind:38172 with an empty d-tag (only unambiguous garbage)", async () => {
+    const db = await freshDB();
+    const empty = makeAnnouncement({ d: "" });
+
+    const result = await upsertAnnouncement(db, empty);
     expect(result).toBe("rejected-invalid");
     expect(await db.announcements.count()).toBe(0);
   });
 
-  it("inserts kind:38172 with a valid 64-char x-only d-tag (Path 1 relaxation)", async () => {
+  it("still rejects kind:38172 with an oversized (>256 char) d-tag", async () => {
+    const db = await freshDB();
+    const oversized = makeAnnouncement({ d: "a".repeat(257) });
+
+    const result = await upsertAnnouncement(db, oversized);
+    expect(result).toBe("rejected-invalid");
+    expect(await db.announcements.count()).toBe(0);
+  });
+
+  it("still rejects kind:38172 with a non-printable d-tag (control char)", async () => {
+    const db = await freshDB();
+    const nonPrintable = makeAnnouncement({ d: "has\nnewline" });
+
+    const result = await upsertAnnouncement(db, nonPrintable);
+    expect(result).toBe("rejected-invalid");
+    expect(await db.announcements.count()).toBe(0);
+  });
+
+  it("inserts kind:38172 with a valid 64-char x-only d-tag", async () => {
     const db = await freshDB();
     const row = makeAnnouncement({ d: D_XONLY });
 
