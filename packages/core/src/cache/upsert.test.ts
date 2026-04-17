@@ -267,6 +267,66 @@ describe("upsertAnnouncement", () => {
     expect(fetched?.content).toBe("update");
   });
 
+  it("ingesting the same eventId 3x: 1 row, 1 inserted + 2 rejected-stale (no-op tiebreak)", async () => {
+    const db = await freshDB();
+    const row = makeAnnouncement({ d: D_XONLY, eventId: EID_LOW, createdAt: 1000 });
+
+    const r1 = await upsertAnnouncement(db, row);
+    const r2 = await upsertAnnouncement(db, row);
+    const r3 = await upsertAnnouncement(db, row);
+
+    // First wins, subsequent dupes lose tiebreak (next.eventId > prev.eventId is false on equal).
+    expect(r1).toBe("inserted");
+    expect(r2).toBe("rejected-stale");
+    expect(r3).toBe("rejected-stale");
+    expect(await db.announcements.count()).toBe(1);
+    const fetched = await db.announcements.get([row.pubkey, row.kind, D_XONLY]);
+    expect(fetched?.eventId).toBe(EID_LOW);
+  });
+
+  it("concurrent upserts of the same [pubkey,kind,d] always converge to the higher createdAt — shuffled order, 5 trials", async () => {
+    // Two distinct events for the same parameterized-replaceable key, with
+    // different createdAt. The transaction guarantees that whichever lands
+    // second still sees the first's row and applies CAS correctly — there's
+    // no "interleaved garbage state" where the older row wins by virtue of
+    // arriving last.
+    const lower = makeAnnouncement({
+      d: D_XONLY,
+      eventId: EID_LOW,
+      createdAt: 1000,
+      content: "lower",
+    });
+    const higher = makeAnnouncement({
+      d: D_XONLY,
+      eventId: EID_HIGH,
+      createdAt: 2000,
+      content: "higher",
+    });
+
+    for (let trial = 0; trial < 5; trial++) {
+      const db = await freshDB();
+      const ops =
+        trial % 2 === 0
+          ? [upsertAnnouncement(db, lower), upsertAnnouncement(db, higher)]
+          : [upsertAnnouncement(db, higher), upsertAnnouncement(db, lower)];
+      const results = await Promise.all(ops);
+
+      // Convergence: exactly one row, the higher-createdAt event always wins.
+      expect(await db.announcements.count()).toBe(1);
+      const fetched = await db.announcements.get([higher.pubkey, higher.kind, D_XONLY]);
+      expect(fetched?.content).toBe("higher");
+      expect(fetched?.createdAt).toBe(2000);
+      expect(fetched?.eventId).toBe(EID_HIGH);
+
+      // Result composition: one inserted, one replaced/rejected depending on
+      // which landed first inside the transaction queue. Either way, no
+      // "rejected-invalid" and no double-insert.
+      expect(results).toContain("inserted");
+      const second = results.find((r) => r !== "inserted");
+      expect(second === "replaced" || second === "rejected-stale").toBe(true);
+    }
+  });
+
   it("preserves verifiedBySignerBinding across a CAS replace (Layer B isn't clobbered by a newer parser-emitted row)", async () => {
     const db = await freshDB();
     const original = makeAnnouncement({ d: D_XONLY, createdAt: 1000, content: "original" });
@@ -498,6 +558,32 @@ describe("upsertMintInfo", () => {
 
     const fetched = await db.mintInfo.get(a.d);
     expect(fetched?.infoJson).toEqual({ v: "a" });
+  });
+
+  it("ok=false overwrites a prior ok=true on a newer fetch — `ok` is NOT part of the CAS predicate", async () => {
+    // Design choice: mintInfo CAS is monotonic on fetchedAt only. The
+    // freshness signal wins regardless of the success bit so the cache
+    // accurately reflects the latest /v1/info attempt — including outages.
+    const db = await freshDB();
+    const ok = makeMintInfo({
+      fetchedAt: 1000,
+      ok: true,
+      infoJson: { name: "live mint" },
+    });
+    const failed = makeMintInfo({
+      fetchedAt: 2000,
+      ok: false,
+      infoJson: {},
+      lastError: "ECONNREFUSED",
+    });
+
+    expect(await upsertMintInfo(db, ok)).toBe("inserted");
+    expect(await upsertMintInfo(db, failed)).toBe("replaced");
+
+    const fetched = await db.mintInfo.get(ok.d);
+    expect(fetched?.ok).toBe(false);
+    expect(fetched?.lastError).toBe("ECONNREFUSED");
+    expect(fetched?.fetchedAt).toBe(2000);
   });
 });
 
