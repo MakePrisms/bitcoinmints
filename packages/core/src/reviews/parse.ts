@@ -122,18 +122,30 @@ function countLeadingStars(match: string): number {
  * Extract rating from content using the 3rd and 4th precedence rules.
  * Format 3 (N/5 and N/10) wins over format 4 (emoji) — a content starting
  * with `[4/5] ⭐⭐⭐⭐⭐` parses as 4, not 5.
+ *
+ * Precedence is explicit, not emergent: when an N/5 or N/10 prefix matches
+ * the content but the parsed number is out of range (e.g. `0/10`, `7/5`),
+ * we return `undefined` rather than falling through to the emoji format.
+ * The reasoning: the author signalled "this review uses the numeric
+ * format" by leading with it — silently reading emoji that might follow
+ * would misrepresent their intent and reward malformed input. Out-of-range
+ * numeric prefixes collapse to "no rating" via the parseReview `?? null`
+ * fallback.
  */
 function parseRatingFromContent(content: string): number | undefined {
   // Format 3a: N/5 anchored at start.
+  // precedence: this format consumed → return (even when out of range)
   const fiveMatch = content.match(CONTENT_FIVE_REGEX);
   if (fiveMatch?.[1]) {
     const r = toRating(fiveMatch[1]);
     if (r !== undefined) return r;
+    return undefined;
   }
   // Format 3b: N/10 anchored at start — divide by 2, round to nearest,
   // clamp into 1..5. We round-to-nearest (not floor) so `5/10` → 3 and
   // `7/10` → 4 rather than both flooring to 3. An `N` outside 0..10 is
   // treated as missing.
+  // precedence: this format consumed → return (even when out of range)
   const tenMatch = content.match(CONTENT_TEN_REGEX);
   if (tenMatch?.[1]) {
     const n = Number.parseInt(tenMatch[1], 10);
@@ -143,6 +155,7 @@ function parseRatingFromContent(content: string): number | undefined {
       // than lying about a 1-star review.
       if (scaled >= MIN_RATING && scaled <= MAX_RATING) return scaled;
     }
+    return undefined;
   }
   // Format 4: leading 1..5 emoji run.
   const emojiMatch = content.match(CONTENT_EMOJI_REGEX);
