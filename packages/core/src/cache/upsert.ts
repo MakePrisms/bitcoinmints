@@ -15,14 +15,16 @@
  * Layer A gate for kind:38172: before writing an announcement we check
  * isValidCashuDTag(d). Invalid shapes (bot spam, non-hex garbage) are
  * returned as "rejected-invalid" and never hit the DB. kind:38173
- * (Fedimint) bypasses Layer A — federation IDs have a different shape
- * and their validator is a TODO-v1.1 concern.
+ * (Fedimint) uses a sibling shape gate (isValidFedimintDTag) — every real
+ * federation ID in the audit corpus is 64-char lowercase hex, so short /
+ * junk d-tags with `["k","38173"]` are still filtered at the same choke
+ * point as Cashu bot spam.
  *
  * mintInfo and mintAggregate aren't event-based, so their CAS predicate
  * is a monotonically-increasing timestamp: `fetchedAt` for mintInfo,
  * `updatedAt` for mintAggregate.
  */
-import { isValidCashuDTag } from "../nip87/dtag";
+import { isValidCashuDTag, isValidFedimintDTag } from "../nip87/dtag";
 import type {
   AnnouncementRow,
   BitcoinmintsDB,
@@ -56,14 +58,19 @@ function nextWins(
   return next.eventId > prev.eventId;
 }
 
-/** Upsert a kind:38172 or kind:38173 announcement with Layer A gating on 38172. */
+/** Upsert a kind:38172 or kind:38173 announcement with Layer A gating on both kinds. */
 export async function upsertAnnouncement(
   db: BitcoinmintsDB,
   row: AnnouncementRow,
 ): Promise<UpsertResult> {
-  // Layer A gate — reject invalid Cashu d-tag shapes before touching the DB.
-  // Fedimint (38173) bypasses: federation-id shape is TODO-v1.1.
-  if (row.kind === 38172 && !isValidCashuDTag(row.d)) {
+  // Layer A gate — reject invalid d-tag shapes before touching the DB.
+  // Cashu (38172) requires a 64- or 66-char secp256k1 pubkey shape;
+  // Fedimint (38173) requires a 64-char lowercase hex federation-id shape.
+  // A short/junk d-tag with `k=38173` slapped on is still bot spam and
+  // must be caught by the same firewall — don't free-pass by kind alone.
+  if (row.kind === 38173) {
+    if (!isValidFedimintDTag(row.d)) return "rejected-invalid";
+  } else if (!isValidCashuDTag(row.d)) {
     return "rejected-invalid";
   }
 
@@ -88,8 +95,41 @@ export async function upsertAnnouncement(
   });
 }
 
-/** Upsert a kind:38000 review. No Layer A gate — the `d` here points at a mint but isn't itself a Cashu pubkey owned by the reviewer. */
+/**
+ * Upsert a kind:38000 review with Layer A gating on the target `d` tag.
+ *
+ * The review's `d` points at a mint. When `k === 38172` (or `k` is absent,
+ * which is how most in-the-wild Cashu reviews shape), we apply the same
+ * Layer A d-regex gate that `upsertAnnouncement` uses — if the referenced
+ * mint pubkey isn't 64/66-char hex, the review is bot-spam pointing at
+ * bot-spam, returned as `rejected-invalid`. This is the firewall that
+ * keeps the 959 zero-d-tag bot spam events (per relay-strategy §4) from
+ * filtering up into the ranking aggregate.
+ *
+ * `k === 38173` (Fedimint) switches to the sibling `isValidFedimintDTag`
+ * shape gate — every real federation ID in the audit corpus is lowercase
+ * 64-char hex, so a short / junk d-tag with `k=38173` attached is still
+ * bot spam and must be caught by the same firewall.
+ *
+ * Note: this low-level upsert is the mechanical write. It does NOT
+ * materialize the `mintAggregate` row — the `reviews/` wrapper composes
+ * this with `recomputeAggregateInTx` inside a single transaction so the
+ * two stores stay in sync. Callers outside `reviews/` (integration tests,
+ * direct usage) can call this helper directly and will simply skip the
+ * aggregate materialization — safe but stale.
+ */
 export async function upsertReview(db: BitcoinmintsDB, row: ReviewRow): Promise<UpsertResult> {
+  // Layer A gate — reject invalid d-tag shapes before touching the DB.
+  // Reviews point at a target mint via `d`; the pointer-kind `k` selects
+  // which shape gate applies. No `k` tag → treat as Cashu (the default
+  // for in-the-wild events per rating-tag-research §3). Fedimint rows
+  // still get a sibling shape check (64-char hex federation id) so junk
+  // d-tags with `k=38173` slapped on don't free-pass the firewall.
+  if (row.k === 38173) {
+    if (!isValidFedimintDTag(row.d)) return "rejected-invalid";
+  } else if (!isValidCashuDTag(row.d)) {
+    return "rejected-invalid";
+  }
   return db.transaction("rw", db.reviews, async () => {
     const prev = await db.reviews.get([row.pubkey, row.kind, row.d]);
     if (!prev) {

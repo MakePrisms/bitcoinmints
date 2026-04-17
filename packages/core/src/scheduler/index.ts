@@ -70,31 +70,43 @@ import {
   type BitcoinmintsDB,
   type ProfileRow,
   type RelayListRow,
-  type ReviewRow,
   upsertAnnouncement,
   upsertMintInfo,
   upsertProfile,
   upsertRelayList,
-  upsertReview,
 } from "../cache";
 import type { MintInfoFetcher } from "../cashu/info";
 import { type LayerBResult, verifySignerBinding } from "../cashu/layerB";
-import {
-  type MintAnnouncement,
-  type MintRecommendation,
-  parseMintAnnouncement,
-  parseRecommendation,
-} from "../nip87";
+import { type MintAnnouncement, parseMintAnnouncement } from "../nip87";
 import type { Pool, PoolHandle } from "../nostr";
+import { parseReview } from "../reviews/parse";
+import { upsertReviewWithAggregate } from "../reviews/upsert";
 
 /** Observable counters surfaced via getStats() — for the UI in PR #6+. */
 export type SchedulerStats = {
   eventsReceived: number;
   accepted: number;
   rejectedByLayerA: number;
+  /**
+   * kind:38000 reviews that were dropped because `parseReview` returned
+   * `null` — either the `d` tag was missing/empty or the event was
+   * unexpectedly not kind:38000. Counted separately from `rejectedByLayerA`
+   * because it's a parser-level reject (malformed event) rather than a
+   * shape-gate reject (valid event pointing at bot-spam).
+   */
+  rejectedByParse: number;
   layerBPending: number;
   layerBVerified: number;
   layerBFailed: number;
+  /**
+   * Count of exceptions thrown out of the per-event handler after we've
+   * started processing. A thrown Dexie transaction (QuotaExceeded, schema
+   * collision, unexpected disk state) or any other unhandled error in a
+   * kind-specific branch bumps this counter — without it, the error would
+   * become an unhandled promise rejection and the stats would silently
+   * freeze at last-good while ingest continued to look healthy.
+   */
+  handlerErrors: number;
 };
 
 export type Scheduler = {
@@ -206,21 +218,6 @@ function toAnnouncementRow(parsed: MintAnnouncement): AnnouncementRow {
   return row;
 }
 
-function toReviewRow(parsed: MintRecommendation): ReviewRow {
-  const row: ReviewRow = {
-    pubkey: parsed.pubkey,
-    kind: 38000,
-    d: parsed.d,
-    eventId: parsed.eventId,
-    createdAt: parsed.createdAt,
-    content: parsed.content,
-    rawTags: parsed.raw.tags,
-  };
-  if (parsed.k !== undefined) row.k = parsed.k;
-  if (parsed.rating !== undefined) row.rating = parsed.rating;
-  return row;
-}
-
 /** Best-effort kind:0 parse. JSON content with name/picture/etc. */
 function toProfileRow(event: NostrEvent): ProfileRow | null {
   if (event.kind !== 0) return null;
@@ -277,9 +274,11 @@ export function createScheduler(config: SchedulerConfig): Scheduler {
     eventsReceived: 0,
     accepted: 0,
     rejectedByLayerA: 0,
+    rejectedByParse: 0,
     layerBPending: 0,
     layerBVerified: 0,
     layerBFailed: 0,
+    handlerErrors: 0,
   };
 
   // Tracks (kind -> highest createdAt seen). Used to compute the `since`
@@ -578,7 +577,20 @@ export function createScheduler(config: SchedulerConfig): Scheduler {
     inflight.add(work);
   }
 
-  /** Per-event handler — single funnel for all kinds. */
+  /**
+   * Per-event handler — single funnel for all kinds.
+   *
+   * Each case body is wrapped in its own try/catch so a thrown Dexie
+   * transaction (QuotaExceeded, schema collision, unexpected disk state)
+   * or any other branch-local exception gets counted into
+   * `stats.handlerErrors` and logged with a stable prefix. Without the
+   * wrappers, the rejection would escape the `void onEvent(event)` call
+   * at the subscription boundary and stats would silently freeze at
+   * last-good while ingest continued to look healthy (silent-failure
+   * gap). Log surface matches `reenqueueUnverified`'s existing pattern:
+   * a `[scheduler]`-prefixed console call, no structured logger is wired
+   * through the package yet.
+   */
   async function onEvent(event: NostrEvent): Promise<void> {
     if (stopped) return;
     stats.eventsReceived += 1;
@@ -586,53 +598,103 @@ export function createScheduler(config: SchedulerConfig): Scheduler {
     switch (event.kind) {
       case 38172:
       case 38173: {
-        const parsed = parseMintAnnouncement(event);
-        if (!parsed) return;
-        const row = toAnnouncementRow(parsed);
-        const result = await upsertAnnouncement(db, row);
-        if (result === "rejected-invalid") {
-          stats.rejectedByLayerA += 1;
-        }
-        if (result === "inserted" || result === "replaced") {
-          stats.accepted += 1;
-          updateWatermark(event.kind, event.created_at);
-          // Layer B only runs on Cashu — verifySignerBinding will short-
-          // circuit non-cashu, but skipping the enqueue avoids the
-          // bookkeeping noise.
-          if (event.kind === 38172) {
-            enqueueLayerB(row);
+        try {
+          const parsed = parseMintAnnouncement(event);
+          if (!parsed) return;
+          const row = toAnnouncementRow(parsed);
+          const result = await upsertAnnouncement(db, row);
+          if (result === "rejected-invalid") {
+            stats.rejectedByLayerA += 1;
           }
+          if (result === "inserted" || result === "replaced") {
+            stats.accepted += 1;
+            updateWatermark(event.kind, event.created_at);
+            // Layer B only runs on Cashu — verifySignerBinding will short-
+            // circuit non-cashu, but skipping the enqueue avoids the
+            // bookkeeping noise.
+            if (event.kind === 38172) {
+              enqueueLayerB(row);
+            }
+          }
+        } catch (err) {
+          stats.handlerErrors += 1;
+          console.error("[scheduler] handler error", {
+            kind: event.kind,
+            eventId: event.id,
+            err,
+          });
         }
         return;
       }
       case 38000: {
-        const parsed = parseRecommendation(event);
-        if (!parsed) return;
-        const row = toReviewRow(parsed);
-        const result = await upsertReview(db, row);
-        if (result === "inserted" || result === "replaced") {
-          stats.accepted += 1;
-          updateWatermark(event.kind, event.created_at);
+        try {
+          // PR #5: parse via reviews/parseReview (all 4 rating formats +
+          // null fallback) and route through the aggregate-materializing
+          // upsert wrapper so the mintAggregate row stays in sync inside
+          // the same Dexie transaction as the review write.
+          const row = parseReview(event);
+          if (!row) {
+            // parseReview returns null for missing/empty `d` or wrong kind
+            // — neither should reach here in a healthy pipeline but both
+            // are silent drops worth counting (silent-failure gap).
+            stats.rejectedByParse += 1;
+            return;
+          }
+          const result = await upsertReviewWithAggregate(db, row, now);
+          if (result === "inserted" || result === "replaced") {
+            stats.accepted += 1;
+            updateWatermark(event.kind, event.created_at);
+          } else if (result === "rejected-invalid") {
+            // Layer A gate on reviews: pointing at a bot-spam d-tag. Count
+            // under the same stats bucket as the announcement Layer A
+            // rejection — it's the same firewall.
+            stats.rejectedByLayerA += 1;
+          }
+        } catch (err) {
+          stats.handlerErrors += 1;
+          console.error("[scheduler] handler error", {
+            kind: event.kind,
+            eventId: event.id,
+            err,
+          });
         }
         return;
       }
       case 0: {
-        const row = toProfileRow(event);
-        if (!row) return;
-        const result = await upsertProfile(db, row);
-        if (result === "inserted" || result === "replaced") {
-          stats.accepted += 1;
-          updateWatermark(event.kind, event.created_at);
+        try {
+          const row = toProfileRow(event);
+          if (!row) return;
+          const result = await upsertProfile(db, row);
+          if (result === "inserted" || result === "replaced") {
+            stats.accepted += 1;
+            updateWatermark(event.kind, event.created_at);
+          }
+        } catch (err) {
+          stats.handlerErrors += 1;
+          console.error("[scheduler] handler error", {
+            kind: event.kind,
+            eventId: event.id,
+            err,
+          });
         }
         return;
       }
       case 10002: {
-        const row = toRelayListRow(event);
-        if (!row) return;
-        const result = await upsertRelayList(db, row);
-        if (result === "inserted" || result === "replaced") {
-          stats.accepted += 1;
-          updateWatermark(event.kind, event.created_at);
+        try {
+          const row = toRelayListRow(event);
+          if (!row) return;
+          const result = await upsertRelayList(db, row);
+          if (result === "inserted" || result === "replaced") {
+            stats.accepted += 1;
+            updateWatermark(event.kind, event.created_at);
+          }
+        } catch (err) {
+          stats.handlerErrors += 1;
+          console.error("[scheduler] handler error", {
+            kind: event.kind,
+            eventId: event.id,
+            err,
+          });
         }
         return;
       }
@@ -687,9 +749,10 @@ export function createScheduler(config: SchedulerConfig): Scheduler {
           filters,
           onEvent: (event) => {
             // onEvent returns a promise; we don't await here because the
-            // pool callback contract is sync. Errors inside the handler
-            // are swallowed at this boundary (each kind's handler does
-            // its own try-catch around DB writes via Dexie's transaction).
+            // pool callback contract is sync. Each kind's case body wraps
+            // its own try/catch that counts into stats.handlerErrors, so
+            // a thrown Dexie transaction can't escape as an unhandled
+            // rejection or silently freeze the stats.
             void onEvent(event);
           },
           closeOnEose: false,
