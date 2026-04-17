@@ -19,14 +19,16 @@ afterEach(async () => {
 });
 
 describe("BitcoinmintsDB schema", () => {
-  it("opens at version 2 with all 6 tables present", async () => {
+  it("opens at version 3 with all 6 tables present", async () => {
     const db = new BitcoinmintsDB(freshName());
     toDispose.push(db);
     await db.open();
 
-    // v2 adds the [kind+createdAt] compound index to announcements (used by
-    // restoreWatermarks for bounded .last() lookups per kind).
-    expect(db.verno).toBe(2);
+    // v3 renames mintAggregate's `bayesianRank` index → `bayesianScore` and
+    // adds `avgRating` so the ranking aggregator can sort by either without
+    // a full-table scan. v2 added the [kind+createdAt] compound index on
+    // announcements (used by scheduler.restoreWatermarks).
+    expect(db.verno).toBe(3);
     const names = db.tables.map((t) => t.name).sort();
     expect(names).toEqual(
       ["announcements", "mintAggregate", "mintInfo", "profiles", "relayLists", "reviews"].sort(),
@@ -74,8 +76,9 @@ describe("BitcoinmintsDB schema", () => {
     expect(indexNames("reviews")).toEqual(["createdAt", "d", "eventId", "k"]);
     // mintInfo secondary: fetchedAt, ok
     expect(indexNames("mintInfo")).toEqual(["fetchedAt", "ok"]);
-    // mintAggregate secondary: bayesianRank, updatedAt
-    expect(indexNames("mintAggregate")).toEqual(["bayesianRank", "updatedAt"]);
+    // mintAggregate secondary (v3): bayesianScore + avgRating (new) +
+    // updatedAt. `bayesianRank` from v1 is dropped in v3.
+    expect(indexNames("mintAggregate")).toEqual(["avgRating", "bayesianScore", "updatedAt"]);
   });
 
   it("starts empty", async () => {

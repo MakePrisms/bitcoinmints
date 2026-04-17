@@ -112,8 +112,9 @@ function makeMintAggregate(over: Partial<MintAggregateRow> = {}): MintAggregateR
   return {
     d: D_XONLY,
     reviewCount: 5,
-    averageRating: 4.2,
-    bayesianRank: 3.8,
+    ratedCount: 5,
+    avgRating: 4.2,
+    bayesianScore: 3.8,
     updatedAt: 1_700_000_000,
     ...over,
   };
@@ -590,8 +591,8 @@ describe("upsertMintInfo", () => {
 describe("upsertMintAggregate", () => {
   it("inserts, replaces on newer updatedAt, rejects older", async () => {
     const db = await freshDB();
-    const older = makeMintAggregate({ updatedAt: 1000, bayesianRank: 1.0 });
-    const newer = makeMintAggregate({ updatedAt: 2000, bayesianRank: 4.5 });
+    const older = makeMintAggregate({ updatedAt: 1000, bayesianScore: 1.0 });
+    const newer = makeMintAggregate({ updatedAt: 2000, bayesianScore: 4.5 });
     const ancient = makeMintAggregate({ updatedAt: 500 });
 
     expect(await upsertMintAggregate(db, older)).toBe("inserted");
@@ -599,7 +600,7 @@ describe("upsertMintAggregate", () => {
     expect(await upsertMintAggregate(db, ancient)).toBe("rejected-stale");
 
     const fetched = await db.mintAggregate.get(older.d);
-    expect(fetched?.bayesianRank).toBe(4.5);
+    expect(fetched?.bayesianScore).toBe(4.5);
     expect(fetched?.updatedAt).toBe(2000);
   });
 });

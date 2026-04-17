@@ -70,22 +70,17 @@ import {
   type BitcoinmintsDB,
   type ProfileRow,
   type RelayListRow,
-  type ReviewRow,
   upsertAnnouncement,
   upsertMintInfo,
   upsertProfile,
   upsertRelayList,
-  upsertReview,
 } from "../cache";
 import type { MintInfoFetcher } from "../cashu/info";
 import { type LayerBResult, verifySignerBinding } from "../cashu/layerB";
-import {
-  type MintAnnouncement,
-  type MintRecommendation,
-  parseMintAnnouncement,
-  parseRecommendation,
-} from "../nip87";
+import { type MintAnnouncement, parseMintAnnouncement } from "../nip87";
 import type { Pool, PoolHandle } from "../nostr";
+import { parseReview } from "../reviews/parse";
+import { upsertReviewWithAggregate } from "../reviews/upsert";
 
 /** Observable counters surfaced via getStats() — for the UI in PR #6+. */
 export type SchedulerStats = {
@@ -203,21 +198,6 @@ function toAnnouncementRow(parsed: MintAnnouncement): AnnouncementRow {
   if (parsed.nuts !== undefined) row.nuts = parsed.nuts;
   if (parsed.modules !== undefined) row.modules = parsed.modules;
   if (parsed.n !== undefined) row.n = parsed.n;
-  return row;
-}
-
-function toReviewRow(parsed: MintRecommendation): ReviewRow {
-  const row: ReviewRow = {
-    pubkey: parsed.pubkey,
-    kind: 38000,
-    d: parsed.d,
-    eventId: parsed.eventId,
-    createdAt: parsed.createdAt,
-    content: parsed.content,
-    rawTags: parsed.raw.tags,
-  };
-  if (parsed.k !== undefined) row.k = parsed.k;
-  if (parsed.rating !== undefined) row.rating = parsed.rating;
   return row;
 }
 
@@ -606,13 +586,21 @@ export function createScheduler(config: SchedulerConfig): Scheduler {
         return;
       }
       case 38000: {
-        const parsed = parseRecommendation(event);
-        if (!parsed) return;
-        const row = toReviewRow(parsed);
-        const result = await upsertReview(db, row);
+        // PR #5: parse via reviews/parseReview (all 4 rating formats +
+        // null fallback) and route through the aggregate-materializing
+        // upsert wrapper so the mintAggregate row stays in sync inside
+        // the same Dexie transaction as the review write.
+        const row = parseReview(event);
+        if (!row) return;
+        const result = await upsertReviewWithAggregate(db, row, now);
         if (result === "inserted" || result === "replaced") {
           stats.accepted += 1;
           updateWatermark(event.kind, event.created_at);
+        } else if (result === "rejected-invalid") {
+          // Layer A gate on reviews: pointing at a bot-spam d-tag. Count
+          // under the same stats bucket as the announcement Layer A
+          // rejection — it's the same firewall.
+          stats.rejectedByLayerA += 1;
         }
         return;
       }

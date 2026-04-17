@@ -88,8 +88,36 @@ export async function upsertAnnouncement(
   });
 }
 
-/** Upsert a kind:38000 review. No Layer A gate — the `d` here points at a mint but isn't itself a Cashu pubkey owned by the reviewer. */
+/**
+ * Upsert a kind:38000 review with Layer A gating on the target `d` tag.
+ *
+ * The review's `d` points at a mint. When `k === 38172` (or `k` is absent,
+ * which is how most in-the-wild Cashu reviews shape), we apply the same
+ * Layer A d-regex gate that `upsertAnnouncement` uses — if the referenced
+ * mint pubkey isn't 64/66-char hex, the review is bot-spam pointing at
+ * bot-spam, returned as `rejected-invalid`. This is the firewall that
+ * keeps the 959 zero-d-tag bot spam events (per relay-strategy §4) from
+ * filtering up into the ranking aggregate.
+ *
+ * `k === 38173` (Fedimint) bypasses the gate — federation IDs have a
+ * different shape and their validator is TODO-v1.1, identical to the
+ * announcement upsert.
+ *
+ * Note: this low-level upsert is the mechanical write. It does NOT
+ * materialize the `mintAggregate` row — the `reviews/` wrapper composes
+ * this with `recomputeAggregateInTx` inside a single transaction so the
+ * two stores stay in sync. Callers outside `reviews/` (integration tests,
+ * direct usage) can call this helper directly and will simply skip the
+ * aggregate materialization — safe but stale.
+ */
 export async function upsertReview(db: BitcoinmintsDB, row: ReviewRow): Promise<UpsertResult> {
+  // Layer A gate for Cashu-pointing reviews. Fedimint (k=38173) bypasses.
+  // No `k` tag → treat as Cashu (the default for in-the-wild events per
+  // rating-tag-research §3).
+  const isFedimint = row.k === 38173;
+  if (!isFedimint && !isValidCashuDTag(row.d)) {
+    return "rejected-invalid";
+  }
   return db.transaction("rw", db.reviews, async () => {
     const prev = await db.reviews.get([row.pubkey, row.kind, row.d]);
     if (!prev) {

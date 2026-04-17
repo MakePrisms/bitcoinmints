@@ -79,17 +79,23 @@ function toAnnouncementRow(
 }
 
 function toReviewRow(parsed: NonNullable<ReturnType<typeof parseRecommendation>>): ReviewRow {
-  return {
+  // `parsed.rating` is `number | undefined` from the nip87 parse layer;
+  // the cache layer requires `number | null` (explicit "no rating" state).
+  const rating = parsed.rating ?? null;
+  const row: ReviewRow = {
     pubkey: parsed.pubkey,
     kind: 38000,
     d: parsed.d,
     eventId: parsed.eventId,
     createdAt: parsed.createdAt,
-    k: parsed.k,
-    rating: parsed.rating,
     content: parsed.content,
     rawTags: parsed.raw.tags,
+    rating,
   };
+  // `parsed.k` is `number | undefined`; narrow to the Cashu/Fedimint
+  // pair the cache row shape accepts.
+  if (parsed.k === 38172 || parsed.k === 38173) row.k = parsed.k;
+  return row;
 }
 
 /**
@@ -170,12 +176,17 @@ describe("integration: corpus replay → parse → cache", () => {
     expect(inserted.length).toBe(expectedAccepted);
     expect(rejectedInvalid.length).toBe(expectedRejected);
 
-    // Reviews: all 5 recommendations parse and insert (each has unique
-    // [pubkey,38000,d]).
-    expect(await db.reviews.count()).toBe(f.recommendations38000.length);
-    expect(await db.reviews.count()).toBe(5);
+    // Reviews: all 5 recommendations parse, but Layer A applies to the
+    // reviews' `d` tag too (PR #5) — 2 of the 5 point at 16-char legacy
+    // d-tags that pre-date the Cashu-mint-pubkey d-tag convention and
+    // would be indistinguishable from the bot-spam shape the gate is
+    // designed to reject. Those are `rejected-invalid`. The remaining 3
+    // reference real 64-char Cashu mint pubkeys and insert cleanly.
     const reviewsInserted = reviewResults.filter((r) => r.result === "inserted");
-    expect(reviewsInserted.length).toBe(5);
+    const reviewsRejectedInvalid = reviewResults.filter((r) => r.result === "rejected-invalid");
+    expect(reviewsInserted.length).toBe(3);
+    expect(reviewsRejectedInvalid.length).toBe(2);
+    expect(await db.reviews.count()).toBe(3);
   });
 
   it("the legacy Nostrodomo (64-char x-only) lands as inserted, not rejected-invalid", async () => {
@@ -431,13 +442,15 @@ describe("integration: scheduler full pipeline", () => {
 
     // Stats: same accept/reject as the parse → cache integration above
     // (5 bot-spam rejected at Layer A; 1 legacy + 2 spec-conforming + 3
-    // fedimint accepted = 6 announcements; 5 reviews accepted).
+    // fedimint accepted = 6 announcements; 3 reviews accepted + 2 reviews
+    // rejected for 16-char legacy d-tags per PR #5's Layer A review gate).
     const stats = sched.getStats();
     // 11 announcements (5 spam + 1 legacy + 2 spec + 3 fedi) + 5 reviews = 16.
     expect(stats.eventsReceived).toBe(16);
-    expect(stats.rejectedByLayerA).toBe(5);
-    // Accepted = 6 announcements + 5 reviews = 11.
-    expect(stats.accepted).toBe(11);
+    // 5 announcement bot-spam rejections + 2 review 16-char d-tag rejections.
+    expect(stats.rejectedByLayerA).toBe(7);
+    // Accepted = 6 announcements + 3 reviews = 9.
+    expect(stats.accepted).toBe(9);
 
     // Layer B: spec-conforming Alpha + Beta verify. Legacy Nostrodomo
     // returns ok but with the wrong pubkey → counts as failed. Fedimint
@@ -447,9 +460,10 @@ describe("integration: scheduler full pipeline", () => {
     expect(stats.layerBPending).toBe(0);
 
     // Cache state matches the parse → cache test exactly: 6 announcements,
-    // 5 reviews. Bot-spam rejected at Layer A, never lands.
+    // 3 reviews (2 more reviews rejected by PR #5's Layer A on reviews'
+    // d-tags). Bot-spam rejected at Layer A, never lands.
     expect(await db.announcements.count()).toBe(6);
-    expect(await db.reviews.count()).toBe(5);
+    expect(await db.reviews.count()).toBe(3);
 
     // Spot-check verifiedBySignerBinding wired through correctly.
     const alphaPubkey = "02aa00000000000000000000000000000000000000000000000000000000000001";
@@ -518,7 +532,8 @@ describe("integration: scheduler full pipeline", () => {
       fetches: calls1.length,
     };
     expect(round1Counts.announcements).toBe(6);
-    expect(round1Counts.reviews).toBe(5);
+    // 3 reviews (2 more gated out by PR #5's Layer A on review d-tags).
+    expect(round1Counts.reviews).toBe(3);
     expect(round1Counts.mintInfo).toBe(3);
 
     // Round 2 — fresh scheduler against same DB. createScheduler reads

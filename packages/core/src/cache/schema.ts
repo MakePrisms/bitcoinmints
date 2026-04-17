@@ -59,10 +59,23 @@ export type ReviewRow = {
   d: string;
   eventId: string;
   createdAt: number;
-  /** Pointer-kind tag: 38172 (Cashu) or 38173 (Fedimint). */
-  k?: number;
-  /** Parsed 0..5 rating. */
-  rating?: number;
+  /**
+   * Pointer-kind tag: 38172 (Cashu) or 38173 (Fedimint). Optional because
+   * in-the-wild events sometimes omit the `k` tag entirely; keep lenient.
+   */
+  k?: 38172 | 38173;
+  /**
+   * Mint URL(s) from optional `u` tags on the recommendation — display-only
+   * helper, does NOT participate in replaceable-event keying.
+   */
+  u?: string[];
+  /**
+   * Parsed rating in 1..5 inclusive, `null` when no rating could be extracted
+   * from tags or content. Explicit `null` rather than `undefined` to
+   * distinguish "no rating present" (which is a valid review state) from
+   * "field not yet populated".
+   */
+  rating: number | null;
   /** Freeform review text. */
   content: string;
   rawTags: string[][];
@@ -111,12 +124,39 @@ export type MintInfoRow = {
   lastError?: string;
 };
 
-/** Aggregated per-mint ranking row (populated in PR #5 — empty in PR #3). */
+/**
+ * Aggregated per-mint ranking row (populated in PR #5).
+ *
+ * Materialized from all `reviews` rows with a given `d`. Recomputed in the
+ * same Dexie transaction as the triggering review upsert so they never go
+ * out of sync. `bayesianScore` is the sort key — it damps low-count
+ * averages so a single 5★ review cannot outrank 4★×10 (see data-model-v1.md
+ * §13).
+ *
+ * Schema transition: v2 exposed `averageRating` + `bayesianRank` as
+ * optional-number fields; v3 tightens the contract so every row carries
+ * explicit values (`avgRating: number | null`, `bayesianScore: number`) and
+ * adds `ratedCount` — the count of reviews contributing to `avgRating`,
+ * distinct from `reviewCount` which counts all reviews including unrated.
+ * The index rename from `bayesianRank` → `bayesianScore` drives the v3 bump.
+ */
 export type MintAggregateRow = {
+  /** Primary key — the mint d-tag this aggregate is for. */
   d: string;
+  /** Count of ALL reviews for this mint (rated + unrated). */
   reviewCount: number;
-  averageRating?: number;
-  bayesianRank?: number;
+  /** Count of reviews with `rating != null` — the divisor of `avgRating`. */
+  ratedCount: number;
+  /** Mean across the `ratedCount` reviews, or `null` when `ratedCount===0`. */
+  avgRating: number | null;
+  /**
+   * Bayesian sort score — `avgRating * log10(ratedCount + 1)` when
+   * `avgRating != null`, else `0`. `log10(1)=0` so a single review gets
+   * `rating * log10(2) ≈ rating * 0.301`; 10 reviews get `rating * log10(11)
+   * ≈ rating * 1.041`. The damping makes low-count mints sort below
+   * higher-count mints of the same average.
+   */
+  bayesianScore: number;
   /** Epoch-ms timestamp of the aggregate recompute (used for CAS). */
   updatedAt: number;
 };
@@ -150,6 +190,18 @@ export class BitcoinmintsDB extends Dexie {
     // (verified in scheduler.restoreWatermarks watermark-restore tests).
     this.version(2).stores({
       announcements: "[pubkey+kind+d], eventId, kind, d, createdAt, [kind+createdAt]",
+    });
+    // v3: rename `bayesianRank` → `bayesianScore` on mintAggregate and add
+    // `avgRating` to the index set so sort-by-avg queries don't need a full
+    // table scan. This is the indexes materialized in PR #5's ranking
+    // aggregator. The prior `bayesianRank` index is dropped — rows written
+    // under v1/v2 (there are none shipped in production yet) would simply
+    // not be queryable by that old name. Any pre-existing rows in local
+    // dev caches are re-keyed by Dexie's additive migration; the shape
+    // change from `averageRating` to `avgRating` is a TypeScript-layer
+    // concern (Dexie doesn't type-check row payloads).
+    this.version(3).stores({
+      mintAggregate: "d, bayesianScore, avgRating, updatedAt",
     });
   }
 }
