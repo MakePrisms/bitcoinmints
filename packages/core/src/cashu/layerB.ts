@@ -47,25 +47,33 @@ import type { MintInfoFetcher, MintInfoResult, MintInfoV1 } from "./info";
  * `verified: true` requires at least one /v1/info ok-fetch with a
  * pubkey-match. `info` is populated with the matching mint's response on
  * success — the scheduler upserts this into `MintInfoRow` to avoid a
- * second round-trip.
+ * second round-trip. `url` records WHICH URL in `announcement.u` actually
+ * verified (the scheduler stores this so a multi-URL mint's MintInfoRow
+ * points at the canonical URL that responded with the matching pubkey,
+ * not just `u[0]`).
  *
  * On failure, `reason` distinguishes:
  *   - "non-cashu"            — input was kind:38173 (Fedimint), Layer B
  *                              doesn't apply.
  *   - "no-urls"              — announcement had an empty `u` array.
- *   - "all-fetches-failed"   — every URL in `u` returned ok:false.
+ *   - "all-fetches-failed"   — every URL in `u` returned ok:false. Treated
+ *                              as a transient class by the scheduler:
+ *                              `verifiedBySignerBinding` stays null so
+ *                              the row is re-tried later.
  *   - "pubkey-mismatch: ..." — at least one URL responded ok:true but no
  *                              fetched pubkey matched the signer. The
  *                              suffix lists the actual mismatched pubkey(s)
  *                              for diagnostics. Includes the announcement
  *                              pubkey in the rendered string so the
  *                              consumer doesn't have to re-attach context.
+ *                              Treated as a real verdict (false, not null).
  */
-export type LayerBResult = {
-  verified: boolean;
-  reason?: string;
-  info?: MintInfoV1;
-};
+export type LayerBResult =
+  | { verified: true; url: string; info: MintInfoV1 }
+  | {
+      verified: false;
+      reason: "non-cashu" | "no-urls" | "all-fetches-failed" | string;
+    };
 
 const NON_CASHU: LayerBResult = { verified: false, reason: "non-cashu" };
 
@@ -95,7 +103,9 @@ export async function verifySignerBinding(
     const result = await fetcher(url);
     fetched.push({ url, result });
     if (result.ok && result.info.pubkey.toLowerCase() === announcementPubkey) {
-      return { verified: true, info: result.info };
+      // Record WHICH url verified so the scheduler can write the canonical
+      // URL into MintInfoRow rather than guessing `u[0]`.
+      return { verified: true, url, info: result.info };
     }
   }
 

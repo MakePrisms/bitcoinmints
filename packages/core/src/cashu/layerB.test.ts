@@ -41,8 +41,9 @@ describe("verifySignerBinding — Cashu happy path", () => {
     const fetcher = okFetcher({ "https://mint.example.com": "02abc" });
     const r = await verifySignerBinding(row, fetcher);
     expect(r.verified).toBe(true);
-    expect(r.info?.pubkey).toBe("02abc");
-    expect(r.reason).toBeUndefined();
+    if (!r.verified) return;
+    expect(r.info.pubkey).toBe("02abc");
+    expect(r.url).toBe("https://mint.example.com");
   });
 
   it("returns verified=true when ANY of multiple URLs matches", async () => {
@@ -57,7 +58,10 @@ describe("verifySignerBinding — Cashu happy path", () => {
     });
     const r = await verifySignerBinding(row, fetcher);
     expect(r.verified).toBe(true);
-    expect(r.info?.pubkey).toBe("02abc");
+    if (!r.verified) return;
+    expect(r.info.pubkey).toBe("02abc");
+    // The matched URL is the one that returned the signer's pubkey, not u[0].
+    expect(r.url).toBe("https://mint-b.example.com");
   });
 
   it("does case-insensitive lowercase compare for pubkey match", async () => {
@@ -97,6 +101,7 @@ describe("verifySignerBinding — Cashu failure modes", () => {
     const fetcher = okFetcher({ "https://mint.example.com": "02zzz" });
     const r = await verifySignerBinding(row, fetcher);
     expect(r.verified).toBe(false);
+    if (r.verified) return;
     expect(r.reason).toContain("pubkey-mismatch");
     expect(r.reason).toContain("02abc"); // announcement pubkey
     expect(r.reason).toContain("02zzz"); // actual mint pubkey
@@ -115,6 +120,7 @@ describe("verifySignerBinding — Cashu failure modes", () => {
     );
     const r = await verifySignerBinding(row, fetcher);
     expect(r.verified).toBe(false);
+    if (r.verified) return;
     expect(r.reason).toBe("all-fetches-failed");
     expect(fetcher).toHaveBeenCalledTimes(2); // tries every URL
   });
@@ -132,6 +138,7 @@ describe("verifySignerBinding — Cashu failure modes", () => {
     });
     const r = await verifySignerBinding(row, fetcher);
     expect(r.verified).toBe(false);
+    if (r.verified) return;
     expect(r.reason).toContain("pubkey-mismatch");
     expect(r.reason).toContain("02zzz");
   });
@@ -143,6 +150,7 @@ describe("verifySignerBinding — Cashu failure modes", () => {
     });
     const r = await verifySignerBinding(row, fetcher);
     expect(r.verified).toBe(false);
+    if (r.verified) return;
     expect(r.reason).toBe("no-urls");
     expect(fetcher).not.toHaveBeenCalled();
   });
@@ -160,7 +168,29 @@ describe("verifySignerBinding — Fedimint rejection", () => {
     });
     const r = await verifySignerBinding(row, fetcher);
     expect(r.verified).toBe(false);
+    if (r.verified) return;
     expect(r.reason).toBe("non-cashu");
     expect(fetcher).not.toHaveBeenCalled();
+  });
+});
+
+describe("verifySignerBinding — multi-URL matched URL tracking", () => {
+  it("returns the URL that actually matched, not u[0]", async () => {
+    // Two URLs: first returns wrong pubkey, second returns the matching one.
+    // The result.url MUST point at the URL that verified, so the scheduler
+    // can write the canonical URL into MintInfoRow rather than guessing.
+    const row = makeRow({
+      pubkey: "02abc",
+      u: ["https://wrong.example", "https://right.example"],
+    });
+    const fetcher = okFetcher({
+      "https://wrong.example": "02zzz",
+      "https://right.example": "02abc",
+    });
+    const r = await verifySignerBinding(row, fetcher);
+    expect(r.verified).toBe(true);
+    if (!r.verified) return;
+    expect(r.url).toBe("https://right.example");
+    expect(r.url).not.toBe("https://wrong.example");
   });
 });
