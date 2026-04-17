@@ -36,7 +36,7 @@ describe("NIP-87 corpus", () => {
     expect(total).toBe(16);
   });
 
-  it("Layer A accepts ONLY the spec-conforming Cashu announcements", () => {
+  it("Layer A accepts spec-conforming AND x-only Cashu announcements, rejects bot spam", () => {
     const all38172: NostrEvent[] = [
       ...f.cashu38172BotSpam,
       ...f.cashu38172Legacy,
@@ -53,8 +53,10 @@ describe("NIP-87 corpus", () => {
     const accepted = parsed.filter((a) => isValidCashuDTag(a.d));
     const rejected = parsed.filter((a) => !isValidCashuDTag(a.d));
 
-    expect(accepted.length).toBe(2);
-    expect(rejected.length).toBe(6);
+    // 2 SpecConforming (66-char compressed) + 1 Legacy (64-char x-only) = 3 accepted.
+    expect(accepted.length).toBe(3);
+    // 5 bot-spam (16-char random) = 5 rejected.
+    expect(rejected.length).toBe(5);
   });
 
   it("Layer A rejects all 5 bot-spam events (16-char d-tags)", () => {
@@ -71,11 +73,13 @@ describe("NIP-87 corpus", () => {
     expect(botPubkeyCount).toBe(5);
   });
 
-  it("Layer A rejects the 64-char raw-pubkey legacy announcement", () => {
+  it("Layer A accepts the 64-char x-only Nostrodomo announcement (de-facto mainstream shape)", () => {
     for (const e of f.cashu38172Legacy) {
       const parsed = parseMintAnnouncement(e);
       expect(parsed).not.toBeNull();
-      expect(parsed && isValidCashuDTag(parsed.d)).toBe(false);
+      expect(parsed && isValidCashuDTag(parsed.d)).toBe(true);
+      // Sanity: it really is 64 chars, not 66.
+      expect(parsed?.d.length).toBe(64);
     }
   });
 

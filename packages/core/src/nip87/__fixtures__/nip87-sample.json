@@ -6,8 +6,8 @@
     "notes": [
       "Events are real, collected in the 2026-04-16 relay survey.",
       "The 5 cashu38172BotSpam events share pubkey 972f233a... and use random 16-char d-tags — part of the 959-event 2025-02-13 burst documented in audit/relay-strategy-v1.md §4.",
-      "The 1 cashu38172Legacy event (Nostrodomo Mint) uses a 64-char raw-pubkey d-tag — pre-spec format.",
-      "No real 38172 event in the audit corpus uses the spec-conforming 66-char compressed-pubkey d-tag; see the report for the critical finding.",
+      "The 1 cashu38172Legacy event (Nostrodomo Mint) uses a 64-char x-only secp256k1 pubkey d-tag. The 'Legacy' bucket name is preserved for continuity, but empirically this IS the de-facto mainstream shape every real Cashu mint in the wild publishes — NOT a legacy minority form.",
+      "Layer A regex relaxed to accept 64-char x-only (empirical fix — no real mints use 66-char compressed in the wild). 16-char bot-spam d-tags still rejected. Accepted: all cashu38172Legacy + cashu38172SpecConforming. Rejected: cashu38172BotSpam only.",
       "The 2 cashu38172SpecConforming events are SYNTHETIC: real mint URLs + contentMetadata, but the d-tag is rewritten to a valid 66-char compressed secp256k1 pubkey (derived by prefixing real mint pubkeys with 02/03). Their sig field is intentionally invalid (we do not re-sign) and the id does not match tag contents — parse layer does not verify signatures or event ids.",
       "Fedimint events are real and filtered to ones that include at least one u tag (required by the parser). Layer A does not apply to kind:38173 — federation-id shape is TODO-v1.1.",
       "Recommendations span three rating formats plus a no-rating case."
