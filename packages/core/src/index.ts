@@ -1,3 +1,4 @@
+export * from "./cache";
 export * from "./nip87";
 export * from "./nostr";
 
