@@ -8,9 +8,12 @@
  *
  * Replaceable-event ordering rules (per NIP-01 §7.3 / NIP-33):
  *   1. Higher `createdAt` wins.
- *   2. Tiebreak — when `createdAt` is equal, the event with the higher
- *      `eventId` (string compare on lowercase hex) wins. This is the
- *      standard replaceable-event tiebreak clients converge on.
+ *   2. Tiebreak — when `createdAt` is equal, the event with the LOWEST
+ *      `eventId` (first in lexical order, string compare on lowercase hex)
+ *      is retained. NIP-01: "the event with the lowest id (first in
+ *      lexical order) should be retained, and the other discarded." This
+ *      is what well-behaved relay peers converge on; any other direction
+ *      produces silent divergence on same-`createdAt` collisions.
  *
  * Layer A gate for kind:38172: before writing an announcement we check
  * isValidCashuDTag(d). Invalid shapes (bot spam, non-hex garbage) are
