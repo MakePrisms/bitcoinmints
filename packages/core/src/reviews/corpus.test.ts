@@ -44,6 +44,12 @@ async function freshDB(): Promise<BitcoinmintsDB> {
  */
 const REAL_EVENTS: NostrEvent[] = [
   // Fedimint 1 — 4 separate reviewers, all 5★.
+  // Note: `a` tags added per P0.3 / P1 — NIP-87 reviews require the
+  // `<kind>:<pubkey>:<d>` pointer. Real corpus events from the relay dump
+  // don't always include `a` (the audit lists it as "optional" per spec
+  // text), but our directory tightens to spec + brief: rejected at parse
+  // when missing or malformed. Fixture events get fabricated `a` tags so
+  // the parse → upsert chain is still exercisable.
   {
     content: "[5/5]",
     created_at: 1776360005,
@@ -54,6 +60,10 @@ const REAL_EVENTS: NostrEvent[] = [
     tags: [
       ["d", "27e032c0f1ff18213c3a94c2426f20a4000479b318712e93a7e56286fed00a2f"],
       ["k", "38173"],
+      [
+        "a",
+        "38173:1944cd868d0b996f58944b5748852d676e84f32c50cb224f65432ddf55045666:27e032c0f1ff18213c3a94c2426f20a4000479b318712e93a7e56286fed00a2f",
+      ],
       ["rating", "5"],
     ],
   },
@@ -68,6 +78,10 @@ const REAL_EVENTS: NostrEvent[] = [
     tags: [
       ["d", "718e421be177486639330d198e870b7345ebd07b2866b5fd3797d73e4bc4c9af"],
       ["k", "38173"],
+      [
+        "a",
+        "38173:3c00865afdb1dd2f8b68a9f802d0bbce2e6e9ebdb03f1a4686494a67e999b0a1:718e421be177486639330d198e870b7345ebd07b2866b5fd3797d73e4bc4c9af",
+      ],
       ["rating", "5"],
     ],
   },
@@ -81,6 +95,10 @@ const REAL_EVENTS: NostrEvent[] = [
     tags: [
       ["d", "718e421be177486639330d198e870b7345ebd07b2866b5fd3797d73e4bc4c9af"],
       ["k", "38173"],
+      [
+        "a",
+        "38173:82f1ae3bdd172c0ce69553165e8237e2fdf7fa32832707de130a274fcfaf1b10:718e421be177486639330d198e870b7345ebd07b2866b5fd3797d73e4bc4c9af",
+      ],
       ["rating", "5"],
     ],
   },
@@ -96,6 +114,10 @@ const REAL_EVENTS: NostrEvent[] = [
     tags: [
       ["d", "718e421be177486639330d198e870b7345ebd07b2866b5fd3797d73e4bc4c9af"],
       ["k", "38173"],
+      [
+        "a",
+        "38173:92f1ae3bdd172c0ce69553165e8237e2fdf7fa32832707de130a274fcfaf1b11:718e421be177486639330d198e870b7345ebd07b2866b5fd3797d73e4bc4c9af",
+      ],
       ["rating", "2", "5"],
     ],
   },
@@ -110,6 +132,10 @@ const REAL_EVENTS: NostrEvent[] = [
     tags: [
       ["d", "3beb71872cea0b97082ff1f6450e722903bc7ac09e5b4dc33105999f2901b4eb"],
       ["k", "38173"],
+      [
+        "a",
+        "38173:ddc17385fdd1cc2df1e6f3a248c5a14ccaa9fcab17281d057e58965423de4617:3beb71872cea0b97082ff1f6450e722903bc7ac09e5b4dc33105999f2901b4eb",
+      ],
       ["rating", "5"],
     ],
   },

@@ -11,17 +11,53 @@ import { parseReview } from "./parse";
 const D_VALID = "5fe928ae0970844f3c5253d2e85a88788486edcbd96c070334a4a2d0d0154a77";
 /** 16-char legacy / bot-spam d-tag. */
 const D_LEGACY_16 = "psvef0yh2zk24tt7";
+/** Reviewer pubkey (also event signer) used in the synthetic `a` tag. */
+const REVIEWER = "2".repeat(64);
+
+/** Build a valid Cashu (k=38172) `a` tag for the given d-tag, signed by REVIEWER. */
+function aTag(d: string, k: 38172 | 38173 = 38172, signer: string = REVIEWER): string[] {
+  return ["a", `${k}:${signer}:${d}`];
+}
+
+/**
+ * Auto-augment a tag-set so the parser accepts it: ensure `k` and `a` are
+ * present (P0.3 + P1 made both required at parse time). Existing tests
+ * pre-date that requirement and only specify the tags they're asserting on
+ * — augmenting keeps each test focused without restating the boilerplate.
+ *
+ * Augmentation rules:
+ *   - If no `k` tag, add `["k","38172"]`.
+ *   - If no `a` tag, derive one from the present `d` and the resolved `k`.
+ *   - If `d` is missing or empty, leave it alone — we want those tests to
+ *     keep exercising the missing-d failure path.
+ */
+function withRequiredTags(tags: string[][]): string[][] {
+  const out = tags.map((t) => [...t]);
+  const hasK = out.some((t) => t[0] === "k");
+  const hasA = out.some((t) => t[0] === "a");
+  const dEntry = out.find((t) => t[0] === "d");
+  const d = dEntry?.[1];
+  if (!hasK) out.push(["k", "38172"]);
+  if (!hasA && typeof d === "string" && d.length > 0) {
+    const kStr = (out.find((t) => t[0] === "k")?.[1] ?? "38172") as string;
+    const k = (kStr === "38173" ? 38173 : 38172) as 38172 | 38173;
+    out.push(aTag(d, k));
+  }
+  return out;
+}
 
 function makeEvent(over: Partial<NostrEvent> & { tags?: string[][] } = {}): NostrEvent {
+  const { tags: _baseTags, ...rest } = over;
+  const baseTags = over.tags ?? [["d", D_VALID]];
   return {
     id: "1".repeat(64),
-    pubkey: "2".repeat(64),
+    pubkey: REVIEWER,
     created_at: 1_700_000_000,
     kind: 38000,
-    tags: [["d", D_VALID]],
     content: "",
     sig: "",
-    ...over,
+    ...rest,
+    tags: withRequiredTags(baseTags),
   } as NostrEvent;
 }
 
@@ -338,7 +374,7 @@ describe("parseReview — null fallback", () => {
   });
 });
 
-describe("parseReview — k tag normalization", () => {
+describe("parseReview — k tag enforcement (P0.3)", () => {
   it("k='38172' narrows to number 38172", () => {
     const row = parseReview(
       makeEvent({
@@ -352,36 +388,126 @@ describe("parseReview — k tag normalization", () => {
   });
 
   it("k='38173' narrows to number 38173", () => {
-    const row = parseReview(
-      makeEvent({
-        tags: [
-          ["d", D_VALID],
-          ["k", "38173"],
-        ],
-      }),
-    );
+    // Use a Fedimint-style synthesised `a` tag that matches k=38173.
+    // (withRequiredTags would default to k=38172 if no k were present, but
+    // here we're explicitly testing k=38173 — provide our own a tag.)
+    const row = parseReview({
+      id: "1".repeat(64),
+      pubkey: REVIEWER,
+      created_at: 1_700_000_000,
+      kind: 38000,
+      tags: [["d", D_VALID], ["k", "38173"], aTag(D_VALID, 38173)],
+      content: "",
+      sig: "",
+    } as unknown as NostrEvent);
     expect(row?.k).toBe(38173);
   });
 
-  it("k absent → row.k is undefined (field omitted)", () => {
-    const row = parseReview(
-      makeEvent({
-        tags: [["d", D_VALID]],
-      }),
-    );
-    expect(row?.k).toBeUndefined();
+  it("P0.3: k absent → parseReview returns null (rejected at parse)", () => {
+    // The auto-augmenter in withRequiredTags adds k by default; bypass it
+    // by hand-rolling an event where the entire tag set is supplied
+    // raw — testing the strict gate.
+    const row = parseReview({
+      id: "1".repeat(64),
+      pubkey: REVIEWER,
+      created_at: 1_700_000_000,
+      kind: 38000,
+      tags: [["d", D_VALID]],
+      content: "",
+      sig: "",
+    } as unknown as NostrEvent);
+    expect(row).toBeNull();
   });
 
-  it("k is something unexpected ('1985') → row.k is undefined", () => {
-    const row = parseReview(
-      makeEvent({
-        tags: [
-          ["d", D_VALID],
-          ["k", "1985"],
-        ],
-      }),
-    );
-    expect(row?.k).toBeUndefined();
+  it("P0.3: k unexpected ('1985') → parseReview returns null", () => {
+    const row = parseReview({
+      id: "1".repeat(64),
+      pubkey: REVIEWER,
+      created_at: 1_700_000_000,
+      kind: 38000,
+      tags: [
+        ["d", D_VALID],
+        ["k", "1985"],
+        // no `a` tag either — k validation runs first regardless.
+      ],
+      content: "",
+      sig: "",
+    } as unknown as NostrEvent);
+    expect(row).toBeNull();
+  });
+
+  it("P0.3 regression: review with k tag but no `a` tag → returns null", () => {
+    // Parser rejects when the spec-required `a` tag is missing, even if
+    // every other required field is present.
+    const row = parseReview({
+      id: "1".repeat(64),
+      pubkey: REVIEWER,
+      created_at: 1_700_000_000,
+      kind: 38000,
+      tags: [
+        ["d", D_VALID],
+        ["k", "38172"],
+      ],
+      content: "[5/5]",
+      sig: "",
+    } as unknown as NostrEvent);
+    expect(row).toBeNull();
+  });
+});
+
+describe("parseReview — `a` tag enforcement (P1)", () => {
+  // Helper: build an event with a custom `a` tag (no auto-augment).
+  function eventWithA(d: string, aValue: string | undefined, k: 38172 | 38173 = 38172): NostrEvent {
+    const tags: string[][] = [
+      ["d", d],
+      ["k", String(k)],
+    ];
+    if (aValue !== undefined) tags.push(["a", aValue]);
+    return {
+      id: "1".repeat(64),
+      pubkey: REVIEWER,
+      created_at: 1_700_000_000,
+      kind: 38000,
+      tags,
+      content: "",
+      sig: "",
+    } as unknown as NostrEvent;
+  }
+
+  it("happy path: well-formed a parses + lands on row.a verbatim", () => {
+    const a = `38172:${REVIEWER}:${D_VALID}`;
+    const row = parseReview(eventWithA(D_VALID, a));
+    expect(row?.a).toBe(a);
+  });
+
+  it("rejects: a tag missing entirely", () => {
+    expect(parseReview(eventWithA(D_VALID, undefined))).toBeNull();
+  });
+
+  it("rejects: malformed a (only one colon)", () => {
+    expect(parseReview(eventWithA(D_VALID, `38172:${REVIEWER}`))).toBeNull();
+  });
+
+  it("rejects: malformed a (no colons)", () => {
+    expect(parseReview(eventWithA(D_VALID, "garbage"))).toBeNull();
+  });
+
+  it("rejects: a's kind doesn't match the k tag", () => {
+    // k=38172 but a says 38173 — disagreement → reject.
+    expect(parseReview(eventWithA(D_VALID, `38173:${REVIEWER}:${D_VALID}`, 38172))).toBeNull();
+  });
+
+  it("rejects: a's pubkey isn't 64-char hex", () => {
+    expect(parseReview(eventWithA(D_VALID, `38172:not-hex:${D_VALID}`))).toBeNull();
+  });
+
+  it("rejects: a's d portion doesn't match the event's d tag", () => {
+    const otherD = "f".repeat(64);
+    expect(parseReview(eventWithA(D_VALID, `38172:${REVIEWER}:${otherD}`))).toBeNull();
+  });
+
+  it("rejects: a's d portion is empty", () => {
+    expect(parseReview(eventWithA(D_VALID, `38172:${REVIEWER}:`))).toBeNull();
   });
 });
 

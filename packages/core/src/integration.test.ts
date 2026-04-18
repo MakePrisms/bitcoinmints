@@ -3,26 +3,21 @@
  *
  * These pin the cross-cutting contracts the unit tests can't: that the
  * curated NIP-87 corpus actually flows through parseMintAnnouncement /
- * parseRecommendation into upsertAnnouncement / upsertReview the way the
- * design says it should.
+ * parseReview into upsertAnnouncement / upsertReview the way the design
+ * says it should.
  *
  * fake-indexeddb is loaded in vitest.setup.ts.
  */
 import type { Event as NostrEvent } from "nostr-tools/core";
 import type { Filter } from "nostr-tools/filter";
 import { afterEach, describe, expect, it } from "vitest";
-import {
-  type AnnouncementRow,
-  BitcoinmintsDB,
-  type ReviewRow,
-  upsertAnnouncement,
-  upsertReview,
-} from "./cache";
+import { type AnnouncementRow, BitcoinmintsDB, upsertAnnouncement, upsertReview } from "./cache";
 import type { MintInfoFetcher, MintInfoResult } from "./cashu/info";
 import fixtures from "./nip87/__fixtures__/nip87-sample.json" with { type: "json" };
 import { isValidCashuDTag } from "./nip87/dtag";
-import { parseMintAnnouncement, parseRecommendation } from "./nip87/parse";
+import { parseMintAnnouncement } from "./nip87/parse";
 import type { Pool, PoolHandle, SubscribeOptions } from "./nostr";
+import { parseReview } from "./reviews/parse";
 import { createScheduler } from "./scheduler";
 
 type Fixture = {
@@ -78,29 +73,10 @@ function toAnnouncementRow(
   };
 }
 
-function toReviewRow(parsed: NonNullable<ReturnType<typeof parseRecommendation>>): ReviewRow {
-  // `parsed.rating` is `number | undefined` from the nip87 parse layer;
-  // the cache layer requires `number | null` (explicit "no rating" state).
-  const rating = parsed.rating ?? null;
-  const row: ReviewRow = {
-    pubkey: parsed.pubkey,
-    kind: 38000,
-    d: parsed.d,
-    eventId: parsed.eventId,
-    createdAt: parsed.createdAt,
-    content: parsed.content,
-    rawTags: parsed.raw.tags,
-    rating,
-  };
-  // `parsed.k` is `number | undefined`; narrow to the Cashu/Fedimint
-  // pair the cache row shape accepts.
-  if (parsed.k === 38172 || parsed.k === 38173) row.k = parsed.k;
-  return row;
-}
-
 /**
  * Replay every event in the corpus through the parse → upsert pipeline and
- * collect the per-event outcome for assertions.
+ * collect the per-event outcome for assertions. Uses `parseReview`
+ * (cache-layer parser) — the strict one production code routes through.
  */
 async function replayCorpus(db: BitcoinmintsDB) {
   const all38172: NostrEvent[] = [
@@ -121,12 +97,12 @@ async function replayCorpus(db: BitcoinmintsDB) {
 
   const reviewResults: { event: NostrEvent; result: string | "parse-failed" }[] = [];
   for (const e of f.recommendations38000) {
-    const parsed = parseRecommendation(e);
-    if (!parsed) {
+    const row = parseReview(e);
+    if (!row) {
       reviewResults.push({ event: e, result: "parse-failed" });
       continue;
     }
-    const result = await upsertReview(db, toReviewRow(parsed));
+    const result = await upsertReview(db, row);
     reviewResults.push({ event: e, result });
   }
 

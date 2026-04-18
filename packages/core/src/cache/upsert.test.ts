@@ -62,13 +62,20 @@ function makeAnnouncement(over: Partial<AnnouncementRow> = {}): AnnouncementRow 
 }
 
 function makeReview(over: Partial<ReviewRow> = {}): ReviewRow {
+  // Default to a 64-char hex reviewer pubkey so the synthetic `a` tag below
+  // satisfies the parse-layer's hex-pubkey check (mirrors what real
+  // upstream-of-cache flows produce).
+  const reviewer = `${"f".repeat(60)}2222`;
+  const d = over.d ?? D_XONLY;
+  const k = (over.k ?? 38172) as 38172 | 38173;
   return {
-    pubkey: `pk-${"0".repeat(60)}2222`,
+    pubkey: reviewer,
     kind: 38000,
-    d: D_XONLY,
+    d,
     eventId: EID_LOW,
     createdAt: 1_700_000_000,
-    k: 38172,
+    k,
+    a: `${k}:${reviewer}:${d}`,
     rating: 5,
     content: "[5/5] good mint",
     rawTags: [],

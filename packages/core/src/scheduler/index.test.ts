@@ -261,14 +261,19 @@ describe("scheduler — pipeline (single event)", () => {
     const sched = createScheduler({ db, pool, fetcher, relays: ["wss://test"] });
     await sched.start();
 
+    // Use a 64-char hex reviewer pubkey for the synthetic `a` tag — P1
+    // requires `a`'s pubkey portion to be 64-char hex.
+    const reviewerPk = "1".repeat(64);
+    const targetD = "02".padEnd(66, "a");
     await pushEvent({
       id: "review-1",
       kind: 38000,
-      pubkey: "reviewer1".padEnd(64, "0"),
+      pubkey: reviewerPk,
       created_at: 1_700_000_000,
       tags: [
         ["k", "38172"],
-        ["d", "02".padEnd(66, "a")],
+        ["d", targetD],
+        ["a", `38172:${reviewerPk}:${targetD}`],
         ["rating", "5", "5"],
       ],
       content: "[5/5] solid",
