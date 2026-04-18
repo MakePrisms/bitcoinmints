@@ -135,32 +135,31 @@ describe("upsertReviewWithAggregate — CAS + aggregate-stays-in-sync", () => {
     expect(after?.avgRating).toBe(5);
   });
 
-  it("tiebreak on eventId: same createdAt, higher eventId wins, aggregate reflects new rating", async () => {
+  it("tiebreak on eventId: same createdAt, lower eventId wins (NIP-01), aggregate reflects new rating", async () => {
+    // NIP-01: "In case of replaceable events with the same timestamp, the
+    // event with the lowest id (first in lexical order) should be retained."
     const db = await freshDB();
-    await upsertReviewWithAggregate(db, makeReview({ eventId: EID_LOW, rating: 1 }));
-    const result = await upsertReviewWithAggregate(
-      db,
-      makeReview({ eventId: EID_HIGH, rating: 5 }),
-    );
+    await upsertReviewWithAggregate(db, makeReview({ eventId: EID_HIGH, rating: 5 }));
+    const result = await upsertReviewWithAggregate(db, makeReview({ eventId: EID_LOW, rating: 1 }));
     expect(result).toBe("replaced");
 
     const agg = await db.mintAggregate.get(D_VALID);
-    expect(agg?.avgRating).toBe(5);
+    expect(agg?.avgRating).toBe(1);
   });
 
-  it("tiebreak rejects lower eventId: aggregate NOT updated", async () => {
+  it("tiebreak rejects higher eventId (NIP-01): aggregate NOT updated", async () => {
     const db = await freshDB();
-    await upsertReviewWithAggregate(db, makeReview({ eventId: EID_HIGH, rating: 5 }), () => 1000);
+    await upsertReviewWithAggregate(db, makeReview({ eventId: EID_LOW, rating: 1 }), () => 1000);
     const result = await upsertReviewWithAggregate(
       db,
-      makeReview({ eventId: EID_LOW, rating: 1 }),
+      makeReview({ eventId: EID_HIGH, rating: 5 }),
       () => 9999,
     );
     expect(result).toBe("rejected-stale");
 
     const agg = await db.mintAggregate.get(D_VALID);
     expect(agg?.updatedAt).toBe(1000);
-    expect(agg?.avgRating).toBe(5);
+    expect(agg?.avgRating).toBe(1);
   });
 
   it("replacing a rated review with an unrated one → aggregate flips to avg=null", async () => {

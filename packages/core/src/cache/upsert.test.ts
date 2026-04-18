@@ -165,29 +165,31 @@ describe("upsertAnnouncement", () => {
     expect(fetched?.content).toBe("newer");
   });
 
-  it("replaces when createdAt ties and eventId is higher lexicographically", async () => {
-    const db = await freshDB();
-    const loEid = makeAnnouncement({ eventId: EID_LOW, content: "lo" });
-    const hiEid = makeAnnouncement({ eventId: EID_HIGH, content: "hi" });
-
-    expect(await upsertAnnouncement(db, loEid)).toBe("inserted");
-    expect(await upsertAnnouncement(db, hiEid)).toBe("replaced");
-
-    const fetched = await db.announcements.get([loEid.pubkey, loEid.kind, loEid.d]);
-    expect(fetched?.eventId).toBe(EID_HIGH);
-    expect(fetched?.content).toBe("hi");
-  });
-
-  it("rejects as stale when createdAt ties and eventId is lower lexicographically", async () => {
+  it("replaces when createdAt ties and eventId is lower lexicographically (NIP-01: lowest id wins)", async () => {
+    // NIP-01: "In case of replaceable events with the same timestamp, the
+    // event with the lowest id (first in lexical order) should be retained."
     const db = await freshDB();
     const hiEid = makeAnnouncement({ eventId: EID_HIGH, content: "hi" });
     const loEid = makeAnnouncement({ eventId: EID_LOW, content: "lo" });
 
     expect(await upsertAnnouncement(db, hiEid)).toBe("inserted");
-    expect(await upsertAnnouncement(db, loEid)).toBe("rejected-stale");
+    expect(await upsertAnnouncement(db, loEid)).toBe("replaced");
 
     const fetched = await db.announcements.get([hiEid.pubkey, hiEid.kind, hiEid.d]);
-    expect(fetched?.eventId).toBe(EID_HIGH);
+    expect(fetched?.eventId).toBe(EID_LOW);
+    expect(fetched?.content).toBe("lo");
+  });
+
+  it("rejects as stale when createdAt ties and eventId is higher lexicographically (NIP-01: lowest id wins)", async () => {
+    const db = await freshDB();
+    const loEid = makeAnnouncement({ eventId: EID_LOW, content: "lo" });
+    const hiEid = makeAnnouncement({ eventId: EID_HIGH, content: "hi" });
+
+    expect(await upsertAnnouncement(db, loEid)).toBe("inserted");
+    expect(await upsertAnnouncement(db, hiEid)).toBe("rejected-stale");
+
+    const fetched = await db.announcements.get([loEid.pubkey, loEid.kind, loEid.d]);
+    expect(fetched?.eventId).toBe(EID_LOW);
   });
 
   it("rejects as invalid when kind:38172 has a 16-char bot-spam d-tag", async () => {
@@ -283,7 +285,7 @@ describe("upsertAnnouncement", () => {
     const r2 = await upsertAnnouncement(db, row);
     const r3 = await upsertAnnouncement(db, row);
 
-    // First wins, subsequent dupes lose tiebreak (next.eventId > prev.eventId is false on equal).
+    // First wins, subsequent dupes lose tiebreak (next.eventId < prev.eventId is false on equal).
     expect(r1).toBe("inserted");
     expect(r2).toBe("rejected-stale");
     expect(r3).toBe("rejected-stale");
@@ -399,28 +401,31 @@ describe("upsertReview", () => {
     expect(fetched?.rating).toBe(5);
   });
 
-  it("tiebreak: higher eventId replaces on createdAt tie", async () => {
-    const db = await freshDB();
-    const loEid = makeReview({ eventId: EID_LOW, rating: 1 });
-    const hiEid = makeReview({ eventId: EID_HIGH, rating: 5 });
-
-    expect(await upsertReview(db, loEid)).toBe("inserted");
-    expect(await upsertReview(db, hiEid)).toBe("replaced");
-
-    const fetched = await db.reviews.get([loEid.pubkey, loEid.kind, loEid.d]);
-    expect(fetched?.rating).toBe(5);
-  });
-
-  it("tiebreak: lower eventId is rejected as stale on createdAt tie", async () => {
+  it("tiebreak: lower eventId replaces on createdAt tie (NIP-01: lowest id wins)", async () => {
+    // NIP-01: "In case of replaceable events with the same timestamp, the
+    // event with the lowest id (first in lexical order) should be retained."
     const db = await freshDB();
     const hiEid = makeReview({ eventId: EID_HIGH, rating: 5 });
     const loEid = makeReview({ eventId: EID_LOW, rating: 1 });
 
     expect(await upsertReview(db, hiEid)).toBe("inserted");
-    expect(await upsertReview(db, loEid)).toBe("rejected-stale");
+    expect(await upsertReview(db, loEid)).toBe("replaced");
 
     const fetched = await db.reviews.get([hiEid.pubkey, hiEid.kind, hiEid.d]);
-    expect(fetched?.rating).toBe(5);
+    expect(fetched?.rating).toBe(1);
+    expect(fetched?.eventId).toBe(EID_LOW);
+  });
+
+  it("tiebreak: higher eventId is rejected as stale on createdAt tie (NIP-01: lowest id wins)", async () => {
+    const db = await freshDB();
+    const loEid = makeReview({ eventId: EID_LOW, rating: 1 });
+    const hiEid = makeReview({ eventId: EID_HIGH, rating: 5 });
+
+    expect(await upsertReview(db, loEid)).toBe("inserted");
+    expect(await upsertReview(db, hiEid)).toBe("rejected-stale");
+
+    const fetched = await db.reviews.get([loEid.pubkey, loEid.kind, loEid.d]);
+    expect(fetched?.rating).toBe(1);
   });
 
   it("keeps separate rows when the same reviewer reviews different mints", async () => {
@@ -461,19 +466,21 @@ describe("upsertProfile", () => {
     expect(fetched?.name).toBe("alice-v2");
   });
 
-  it("tiebreak on eventId when createdAt ties", async () => {
+  it("tiebreak on eventId when createdAt ties (NIP-01: lowest id wins)", async () => {
+    // NIP-01: "In case of replaceable events with the same timestamp, the
+    // event with the lowest id (first in lexical order) should be retained."
     const db = await freshDB();
-    const lo = makeProfile({ eventId: EID_LOW, name: "lo" });
     const hi = makeProfile({ eventId: EID_HIGH, name: "hi" });
+    const lo = makeProfile({ eventId: EID_LOW, name: "lo" });
 
-    expect(await upsertProfile(db, lo)).toBe("inserted");
-    expect(await upsertProfile(db, hi)).toBe("replaced");
+    expect(await upsertProfile(db, hi)).toBe("inserted");
+    expect(await upsertProfile(db, lo)).toBe("replaced");
 
-    const backToLo = makeProfile({ eventId: EID_LOW, name: "back-to-lo" });
-    expect(await upsertProfile(db, backToLo)).toBe("rejected-stale");
+    const backToHi = makeProfile({ eventId: EID_HIGH, name: "back-to-hi" });
+    expect(await upsertProfile(db, backToHi)).toBe("rejected-stale");
 
     const fetched = await db.profiles.get(lo.pubkey);
-    expect(fetched?.name).toBe("hi");
+    expect(fetched?.name).toBe("lo");
   });
 
   it("keeps one row per pubkey; different pubkeys are independent", async () => {
@@ -506,20 +513,22 @@ describe("upsertRelayList", () => {
     expect(fetched?.relays[0]?.write).toBe(false);
   });
 
-  it("tiebreak on eventId when createdAt ties", async () => {
+  it("tiebreak on eventId when createdAt ties (NIP-01: lowest id wins)", async () => {
+    // NIP-01: "In case of replaceable events with the same timestamp, the
+    // event with the lowest id (first in lexical order) should be retained."
     const db = await freshDB();
-    const lo = makeRelayList({ eventId: EID_LOW });
-    const hi = makeRelayList({
-      eventId: EID_HIGH,
-      relays: [{ url: "wss://hi.example", read: true, write: true }],
+    const hi = makeRelayList({ eventId: EID_HIGH });
+    const lo = makeRelayList({
+      eventId: EID_LOW,
+      relays: [{ url: "wss://lo.example", read: true, write: true }],
     });
 
-    expect(await upsertRelayList(db, lo)).toBe("inserted");
-    expect(await upsertRelayList(db, hi)).toBe("replaced");
+    expect(await upsertRelayList(db, hi)).toBe("inserted");
+    expect(await upsertRelayList(db, lo)).toBe("replaced");
 
-    const fetched = await db.relayLists.get(lo.pubkey);
-    expect(fetched?.eventId).toBe(EID_HIGH);
-    expect(fetched?.relays[0]?.url).toBe("wss://hi.example");
+    const fetched = await db.relayLists.get(hi.pubkey);
+    expect(fetched?.eventId).toBe(EID_LOW);
+    expect(fetched?.relays[0]?.url).toBe("wss://lo.example");
   });
 });
 
