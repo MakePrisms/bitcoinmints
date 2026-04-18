@@ -10,16 +10,25 @@ import { SimplePool } from "nostr-tools/pool";
  * nos.lol + damus alone carry 98.4% of all historical NIP-87 events per
  * /srv/forge/projects/bitcoinmints/audit/relay-strategy-v1.md.
  *
- * relay.8333.space + relay.cashumints.space are cashu-branded relays included
- * for ecosystem citizenship — thin on event count but part of the cashu
- * community's curated NIP-87 surface (8333 is cashu.me's extra default;
- * cashumints.space appears in 2/6 implementor defaults).
+ * Extended with three audited secondary relays (nostr.mom 8 × k38172,
+ * relay.nostr.wirednet.jp 4, relay.nostrplebs.com 2) to widen the Cashu
+ * catch. The alchemist demo against the prior 5-relay seed found only 1
+ * Cashu announcement on the wire — adding these pushes us past the
+ * power-law knee documented in the audit (§3 cumulative table).
+ *
+ * relay.cashumints.space is the sole cashu-branded holdover — thin on event
+ * count (only 4 historical events per audit) but part of the cashu
+ * community's curated NIP-87 surface. relay.8333.space was dropped: the
+ * audit reports a handshake timeout and classifies it as defunct despite
+ * matching the audit.8333 domain.
  */
 export const SEED_RELAYS: readonly string[] = [
   "wss://nos.lol",
   "wss://relay.damus.io",
   "wss://relay.primal.net",
-  "wss://relay.8333.space",
+  "wss://nostr.mom",
+  "wss://relay.nostr.wirednet.jp",
+  "wss://relay.nostrplebs.com",
   "wss://relay.cashumints.space",
 ];
 

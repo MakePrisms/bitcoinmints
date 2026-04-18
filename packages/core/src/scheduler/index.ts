@@ -134,10 +134,38 @@ export type SchedulerConfig = {
   relays: readonly string[];
   /** Optional clock injector for deterministic backoff tests. Defaults to Date.now. */
   now?: () => number;
+  /**
+   * Opt-in per-event debug logging. Default `false` — zero perf cost when
+   * off (no allocations, no logs).
+   *
+   * When `true`, logs through `console.log` / `console.warn` with the
+   * stable `[scheduler]` prefix:
+   *   - on start(): the filters array being sent to relays + the configured
+   *     relay list
+   *   - per event (after the switch branch resolves): kind, id prefix,
+   *     delivering relay, and the resolved path (accepted / rejected-*
+   *     / dropped / replaced)
+   *   - per Layer B resolution: kind/id/url + verdict (verified /
+   *     failed:<reason> / transient)
+   *
+   * Keep the surface console-only — no structured logger is wired through
+   * the package. Intended as a demo/X-ray aid, not production telemetry.
+   */
+  debug?: boolean;
 };
 
 /** NIP-87 + supporting kinds. See data-model-v1.md §1 for the full list. */
 const SUBSCRIBED_KINDS = [38172, 38173, 38000, 0, 10002] as const;
+
+/**
+ * Expose the subscribed kinds tuple for UI consumers that want to render
+ * "filters in use" without duplicating the literal. Frozen through
+ * `as const` in the declaration above, so callers cannot mutate the
+ * underlying array.
+ */
+export function getSubscribedKinds(): readonly number[] {
+  return SUBSCRIBED_KINDS;
+}
 
 /** Initial backoff window for a failed mint URL: attempts=0 → 30s. */
 const BASE_BACKOFF_MS = 30_000;
@@ -269,6 +297,7 @@ function toRelayListRow(event: NostrEvent): RelayListRow | null {
 export function createScheduler(config: SchedulerConfig): Scheduler {
   const { db, pool, fetcher } = config;
   const now = config.now ?? Date.now;
+  const debug = config.debug ?? false;
 
   const stats: SchedulerStats = {
     eventsReceived: 0,
@@ -552,6 +581,23 @@ export function createScheduler(config: SchedulerConfig): Scheduler {
     } else {
       stats.layerBFailed += 1;
     }
+
+    if (debug) {
+      // Verdict mirrors `verdictForPersistence` shape: verified=true →
+      // verified; pubkey-mismatch → failed:<reason>; anything else →
+      // transient (the row stays null and will be retried).
+      let verdict: string;
+      if (result.verified) {
+        verdict = "verified";
+      } else if (typeof result.reason === "string" && result.reason.startsWith("pubkey-mismatch")) {
+        verdict = `failed:${result.reason}`;
+      } else {
+        verdict = `transient:${result.reason ?? "unknown"}`;
+      }
+      console.log(
+        `[scheduler] layerB kind=38172 id=${row.eventId.slice(0, 8)} url=${persistedUrl} verdict=${verdict}`,
+      );
+    }
   }
 
   /**
@@ -590,8 +636,20 @@ export function createScheduler(config: SchedulerConfig): Scheduler {
    * gap). Log surface matches `reenqueueUnverified`'s existing pattern:
    * a `[scheduler]`-prefixed console call, no structured logger is wired
    * through the package yet.
+   *
+   * `relay` is the wss:// URL that delivered the event, threaded through
+   * from the pool's `onEvent(event, relay)` callback purely so the
+   * opt-in debug log line can include it. It is NOT otherwise used by
+   * the scheduler (single global watermark, no per-relay bookkeeping).
    */
-  async function onEvent(event: NostrEvent): Promise<void> {
+  // path labels for the debug per-event line. Kept narrow so we can't
+  // typo a path name and have it silently fall through.
+  type EventPath = "accepted" | "rejected-layerA" | "rejected-parse" | "dropped" | "replaced";
+  const logPath = (kind: number, eventId: string, relay: string, path: EventPath): void => {
+    if (!debug) return;
+    console.log(`[scheduler] kind=${kind} id=${eventId.slice(0, 8)} relay=${relay} path=${path}`);
+  };
+  async function onEvent(event: NostrEvent, relay: string): Promise<void> {
     if (stopped) return;
     stats.eventsReceived += 1;
 
@@ -600,11 +658,16 @@ export function createScheduler(config: SchedulerConfig): Scheduler {
       case 38173: {
         try {
           const parsed = parseMintAnnouncement(event);
-          if (!parsed) return;
+          if (!parsed) {
+            logPath(event.kind, event.id, relay, "dropped");
+            return;
+          }
           const row = toAnnouncementRow(parsed);
           const result = await upsertAnnouncement(db, row);
           if (result === "rejected-invalid") {
             stats.rejectedByLayerA += 1;
+            logPath(event.kind, event.id, relay, "rejected-layerA");
+            return;
           }
           if (result === "inserted" || result === "replaced") {
             stats.accepted += 1;
@@ -615,7 +678,12 @@ export function createScheduler(config: SchedulerConfig): Scheduler {
             if (event.kind === 38172) {
               enqueueLayerB(row);
             }
+            logPath(event.kind, event.id, relay, result === "replaced" ? "replaced" : "accepted");
+            return;
           }
+          // rejected-stale or any other terminal upsert result: count as
+          // a drop so the trace doesn't go silent on duplicates.
+          logPath(event.kind, event.id, relay, "dropped");
         } catch (err) {
           stats.handlerErrors += 1;
           console.error("[scheduler] handler error", {
@@ -638,17 +706,22 @@ export function createScheduler(config: SchedulerConfig): Scheduler {
             // — neither should reach here in a healthy pipeline but both
             // are silent drops worth counting (silent-failure gap).
             stats.rejectedByParse += 1;
+            logPath(event.kind, event.id, relay, "rejected-parse");
             return;
           }
           const result = await upsertReviewWithAggregate(db, row, now);
           if (result === "inserted" || result === "replaced") {
             stats.accepted += 1;
             updateWatermark(event.kind, event.created_at);
+            logPath(event.kind, event.id, relay, result === "replaced" ? "replaced" : "accepted");
           } else if (result === "rejected-invalid") {
             // Layer A gate on reviews: pointing at a bot-spam d-tag. Count
             // under the same stats bucket as the announcement Layer A
             // rejection — it's the same firewall.
             stats.rejectedByLayerA += 1;
+            logPath(event.kind, event.id, relay, "rejected-layerA");
+          } else {
+            logPath(event.kind, event.id, relay, "dropped");
           }
         } catch (err) {
           stats.handlerErrors += 1;
@@ -663,11 +736,17 @@ export function createScheduler(config: SchedulerConfig): Scheduler {
       case 0: {
         try {
           const row = toProfileRow(event);
-          if (!row) return;
+          if (!row) {
+            logPath(event.kind, event.id, relay, "dropped");
+            return;
+          }
           const result = await upsertProfile(db, row);
           if (result === "inserted" || result === "replaced") {
             stats.accepted += 1;
             updateWatermark(event.kind, event.created_at);
+            logPath(event.kind, event.id, relay, result === "replaced" ? "replaced" : "accepted");
+          } else {
+            logPath(event.kind, event.id, relay, "dropped");
           }
         } catch (err) {
           stats.handlerErrors += 1;
@@ -682,11 +761,17 @@ export function createScheduler(config: SchedulerConfig): Scheduler {
       case 10002: {
         try {
           const row = toRelayListRow(event);
-          if (!row) return;
+          if (!row) {
+            logPath(event.kind, event.id, relay, "dropped");
+            return;
+          }
           const result = await upsertRelayList(db, row);
           if (result === "inserted" || result === "replaced") {
             stats.accepted += 1;
             updateWatermark(event.kind, event.created_at);
+            logPath(event.kind, event.id, relay, result === "replaced" ? "replaced" : "accepted");
+          } else {
+            logPath(event.kind, event.id, relay, "dropped");
           }
         } catch (err) {
           stats.handlerErrors += 1;
@@ -699,6 +784,7 @@ export function createScheduler(config: SchedulerConfig): Scheduler {
         return;
       }
       default:
+        logPath(event.kind, event.id, relay, "dropped");
         return; // unknown kind — ignore
     }
   }
@@ -745,15 +831,20 @@ export function createScheduler(config: SchedulerConfig): Scheduler {
           // duplicates CAS-fail at the cache layer.
           return since !== undefined ? { kinds: [kind], since } : { kinds: [kind] };
         });
+        if (debug) {
+          console.log(
+            `[scheduler] start — filters=${JSON.stringify(filters)} relays=${JSON.stringify(config.relays)}`,
+          );
+        }
         handle = pool.subscribe({
           filters,
-          onEvent: (event) => {
+          onEvent: (event, relay) => {
             // onEvent returns a promise; we don't await here because the
             // pool callback contract is sync. Each kind's case body wraps
             // its own try/catch that counts into stats.handlerErrors, so
             // a thrown Dexie transaction can't escape as an unhandled
             // rejection or silently freeze the stats.
-            void onEvent(event);
+            void onEvent(event, relay);
           },
           closeOnEose: false,
         });
