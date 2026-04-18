@@ -60,10 +60,18 @@ export type ReviewRow = {
   eventId: string;
   createdAt: number;
   /**
-   * Pointer-kind tag: 38172 (Cashu) or 38173 (Fedimint). Optional because
-   * in-the-wild events sometimes omit the `k` tag entirely; keep lenient.
+   * Pointer-kind tag: 38172 (Cashu) or 38173 (Fedimint). Required per
+   * NIP-87 (P0.3 — `parseReview` rejects events without it). Typed
+   * required at the cache layer so consumers don't have to handle the
+   * undefined case any more.
    */
-  k?: 38172 | 38173;
+  k: 38172 | 38173;
+  /**
+   * Spec-blessed target pointer: `<kind>:<pubkey>:<d>` per NIP-87. The
+   * authoritative dedup key when a single mint is referenced from multiple
+   * announcements (P1). Required on parse — see `parseReview`.
+   */
+  a: string;
   /**
    * Mint URL(s) from optional `u` tags on the recommendation — display-only
    * helper, does NOT participate in replaceable-event keying.

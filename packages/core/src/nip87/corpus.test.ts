@@ -141,8 +141,9 @@ describe("NIP-87 corpus", () => {
   });
 
   it("the fixture includes at least one rec that relies on the [N/5] content regex", () => {
+    // Mirrors the anchored-at-start canonical form (P1 unification).
     const contentRating = f.recommendations38000.filter(
-      (e) => e.tags.every((t) => t[0] !== "rating") && /(\d(?:\.\d+)?)\s*\/\s*5/.test(e.content),
+      (e) => e.tags.every((t) => t[0] !== "rating") && /^\s*\[?\s*(\d+)\s*\/\s*5\b/.test(e.content),
     );
     expect(contentRating.length).toBeGreaterThanOrEqual(1);
   });

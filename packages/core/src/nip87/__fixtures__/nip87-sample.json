@@ -10,7 +10,8 @@
       "Layer A regex relaxed to accept 64-char x-only (empirical fix — no real mints use 66-char compressed in the wild). 16-char bot-spam d-tags still rejected. Accepted: all cashu38172Legacy + cashu38172SpecConforming. Rejected: cashu38172BotSpam only.",
       "The 2 cashu38172SpecConforming events are SYNTHETIC: real mint URLs + contentMetadata, but the d-tag is rewritten to a valid 66-char compressed secp256k1 pubkey (derived by prefixing real mint pubkeys with 02/03). Their sig field is intentionally invalid (we do not re-sign) and the id does not match tag contents — parse layer does not verify signatures or event ids.",
       "Fedimint events are real and filtered to ones that include at least one u tag (required by the parser). Layer A does not apply to kind:38173 — federation-id shape is TODO-v1.1.",
-      "Recommendations span three rating formats plus a no-rating case."
+      "Recommendations span three rating formats plus a no-rating case.",
+      "P0.3 + P1: every recommendation now carries the spec-required `k` and `a` tags. The `a` tag pubkey portion uses each event's own signer pubkey (the spec's `<kind>:<pubkey>:<d>` format expects the announcement signer's pubkey here). Fixture-internal `a` values point at synthetic announcement keys — they don't need to resolve to a real announcement in the corpus to exercise the parse gate."
     ]
   },
   "cashu38172BotSpam": [
@@ -196,6 +197,11 @@
       "tags": [
         ["d", "b21068c84f5b12ca4fdf93f3e443d3bd7c27e8642d0d52ea2e4dce6fdbbee9df"],
         ["k", "38173"],
+        [
+          "a",
+          "38173:bf5ae4651d81d5a211fac31823458160853a920b2ed03881a578b908280fe690:b21068c84f5b12ca4fdf93f3e443d3bd7c27e8642d0d52ea2e4dce6fdbbee9df",
+          "wss://relay.test"
+        ],
         ["rating", "5"]
       ]
     },
@@ -209,6 +215,10 @@
       "tags": [
         ["d", "b21068c84f5b12ca4fdf93f3e443d3bd7c27e8642d0d52ea2e4dce6fdbbee9df"],
         ["k", "38173"],
+        [
+          "a",
+          "38173:fe7e6de7f758dbdb06cac665a144eeb6898680298b4978ef1711b3e07238fe93:b21068c84f5b12ca4fdf93f3e443d3bd7c27e8642d0d52ea2e4dce6fdbbee9df"
+        ],
         ["rating", "3"]
       ]
     },
@@ -222,6 +232,10 @@
       "tags": [
         ["k", "38172"],
         ["u", "https://obsessedjerky7.lnbits.com/cashu/api/v1/L4bNfiBtTyhEpZWdt6QTb4", "cashu"],
+        [
+          "a",
+          "38172:ae1008d23930b776c18092f6eab41e4b09fcf3f03f3641b1b4e6ee3aa166d760:psvef0yh2zk24tt7"
+        ],
         ["d", "psvef0yh2zk24tt7"]
       ]
     },
@@ -235,7 +249,12 @@
       "tags": [
         ["k", "38172"],
         ["u", "https://mint.cubabitcoin.org", "cashu"],
-        ["a", "38172:cashu-mint-pubkey:nda1zjgriivc1xvv", "wss://bitcoiner.social", "cashu"],
+        [
+          "a",
+          "38172:2871a10447d80a1c7ca542488d9e09c10ed843641f6867b69fd92fb84bbe84dc:nda1zjgriivc1xvv",
+          "wss://bitcoiner.social",
+          "cashu"
+        ],
         ["d", "nda1zjgriivc1xvv"]
       ]
     },
@@ -252,6 +271,10 @@
         [
           "u",
           "fed11qgqzz8mhwden5te0vejkg6tdd9h8gepwvchxjmm5w4hxgunp9e3k7mf0qyqjpj2ykt73ullqfj58lxjh67y5ed53zm8vvfjvk5h65ufz3a8v2nxky9wuce"
+        ],
+        [
+          "a",
+          "38173:7624c028f873a52abf025ea89ff8cd7599dcddd98c1199eebe3a7d76905bb138:c944b2fd1e7fe04ca87f9a57d7894cb69116cec6264cb52faa71228f4ec54cd6"
         ],
         ["n", "mainnet"]
       ]

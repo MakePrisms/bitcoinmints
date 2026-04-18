@@ -426,6 +426,10 @@ export function createScheduler(config: SchedulerConfig): Scheduler {
    *
    *   - verified=true                       → true   (real positive verdict)
    *   - verified=false, all-fetches-failed  → null   (transient — re-try later)
+   *   - verified=false, no-signer-source    → null   (transient — mint exposes
+   *                                                   no usable signer source;
+   *                                                   genuinely unverifiable
+   *                                                   per P0.1 / P0.2)
    *   - verified=false, pubkey-mismatch     → false  (real negative verdict)
    *   - verified=false, anything else       → null   (defensive — treat as transient)
    *

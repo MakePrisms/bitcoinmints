@@ -3,26 +3,21 @@
  *
  * These pin the cross-cutting contracts the unit tests can't: that the
  * curated NIP-87 corpus actually flows through parseMintAnnouncement /
- * parseRecommendation into upsertAnnouncement / upsertReview the way the
- * design says it should.
+ * parseReview into upsertAnnouncement / upsertReview the way the design
+ * says it should.
  *
  * fake-indexeddb is loaded in vitest.setup.ts.
  */
 import type { Event as NostrEvent } from "nostr-tools/core";
 import type { Filter } from "nostr-tools/filter";
 import { afterEach, describe, expect, it } from "vitest";
-import {
-  type AnnouncementRow,
-  BitcoinmintsDB,
-  type ReviewRow,
-  upsertAnnouncement,
-  upsertReview,
-} from "./cache";
+import { type AnnouncementRow, BitcoinmintsDB, upsertAnnouncement, upsertReview } from "./cache";
 import type { MintInfoFetcher, MintInfoResult } from "./cashu/info";
 import fixtures from "./nip87/__fixtures__/nip87-sample.json" with { type: "json" };
 import { isValidCashuDTag } from "./nip87/dtag";
-import { parseMintAnnouncement, parseRecommendation } from "./nip87/parse";
+import { parseMintAnnouncement } from "./nip87/parse";
 import type { Pool, PoolHandle, SubscribeOptions } from "./nostr";
+import { parseReview } from "./reviews/parse";
 import { createScheduler } from "./scheduler";
 
 type Fixture = {
@@ -78,29 +73,10 @@ function toAnnouncementRow(
   };
 }
 
-function toReviewRow(parsed: NonNullable<ReturnType<typeof parseRecommendation>>): ReviewRow {
-  // `parsed.rating` is `number | undefined` from the nip87 parse layer;
-  // the cache layer requires `number | null` (explicit "no rating" state).
-  const rating = parsed.rating ?? null;
-  const row: ReviewRow = {
-    pubkey: parsed.pubkey,
-    kind: 38000,
-    d: parsed.d,
-    eventId: parsed.eventId,
-    createdAt: parsed.createdAt,
-    content: parsed.content,
-    rawTags: parsed.raw.tags,
-    rating,
-  };
-  // `parsed.k` is `number | undefined`; narrow to the Cashu/Fedimint
-  // pair the cache row shape accepts.
-  if (parsed.k === 38172 || parsed.k === 38173) row.k = parsed.k;
-  return row;
-}
-
 /**
  * Replay every event in the corpus through the parse → upsert pipeline and
- * collect the per-event outcome for assertions.
+ * collect the per-event outcome for assertions. Uses `parseReview`
+ * (cache-layer parser) — the strict one production code routes through.
  */
 async function replayCorpus(db: BitcoinmintsDB) {
   const all38172: NostrEvent[] = [
@@ -121,12 +97,12 @@ async function replayCorpus(db: BitcoinmintsDB) {
 
   const reviewResults: { event: NostrEvent; result: string | "parse-failed" }[] = [];
   for (const e of f.recommendations38000) {
-    const parsed = parseRecommendation(e);
-    if (!parsed) {
+    const row = parseReview(e);
+    if (!row) {
       reviewResults.push({ event: e, result: "parse-failed" });
       continue;
     }
-    const result = await upsertReview(db, toReviewRow(parsed));
+    const result = await upsertReview(db, row);
     reviewResults.push({ event: e, result });
   }
 
@@ -430,6 +406,64 @@ async function pushCashuCorpus(pushEvent: (e: NostrEvent) => Promise<void>): Pro
 }
 
 describe("integration: scheduler full pipeline", () => {
+  it("P0.3: k=38173 reviews route through Fedimint gate", async () => {
+    // Gap 3: review routing forks on `k` — k=38172 runs through
+    // `isValidCashuDTag` (64- or 66-char hex), k=38173 runs through
+    // `isValidFedimintDTag` (64-char hex). Before P0.3 the upsert assumed
+    // Cashu by default; a k=38173 review with a 64-char federation id would
+    // "accidentally" pass the Cashu gate (64-char is a valid Cashu x-only
+    // shape too), but k=38173 reviews with a 66-char d-tag or a malformed
+    // d-tag would pass/reject in the wrong direction.
+    //
+    // This pins end-to-end: the 3 k=38173 reviews in the corpus route
+    // through the Fedimint gate, land in the reviews table, and
+    // materialize aggregate rows keyed by the Fedimint federation d-tag
+    // (not any malformed synthetic shape).
+    const db = await freshDB();
+    const { pool, pushEvent } = makeFakePool();
+    const fetcher = makeCorpusFetcher();
+    const sched = createScheduler({ db, pool, fetcher, relays: ["wss://test.relay"] });
+    await sched.start();
+
+    await pushCashuCorpus(pushEvent);
+    await drainLayerB(sched);
+    await sched.stop();
+
+    // The corpus has 3 k=38173 reviews across 2 federation d-tags:
+    //   - b21068... (2 reviews, rated 5 and 3)
+    //   - c944b2... (1 review, no rating)
+    const fedimintFedA = "b21068c84f5b12ca4fdf93f3e443d3bd7c27e8642d0d52ea2e4dce6fdbbee9df";
+    const fedimintFedB = "c944b2fd1e7fe04ca87f9a57d7894cb69116cec6264cb52faa71228f4ec54cd6";
+
+    // Both federation d-tags must be 64-char lowercase hex (Fedimint shape).
+    expect(fedimintFedA).toMatch(/^[0-9a-f]{64}$/);
+    expect(fedimintFedB).toMatch(/^[0-9a-f]{64}$/);
+
+    // Reviews for each federation landed in the reviews table.
+    const reviewsForA = await db.reviews.where("d").equals(fedimintFedA).toArray();
+    const reviewsForB = await db.reviews.where("d").equals(fedimintFedB).toArray();
+    expect(reviewsForA.length).toBe(2);
+    expect(reviewsForB.length).toBe(1);
+    // k tag preserved through the pipeline.
+    for (const r of [...reviewsForA, ...reviewsForB]) expect(r.k).toBe(38173);
+
+    // Aggregate materialization: one mintAggregate row per federation,
+    // reviewCount matches the per-federation reviews count. This is the
+    // load-bearing assertion — a regression where k=38173 reviews upsert
+    // but skip the aggregate recompute (or key by a malformed d-shape)
+    // would surface here.
+    const aggA = await db.mintAggregate.get(fedimintFedA);
+    const aggB = await db.mintAggregate.get(fedimintFedB);
+    expect(aggA).toBeDefined();
+    expect(aggB).toBeDefined();
+    expect(aggA?.reviewCount).toBe(2);
+    expect(aggB?.reviewCount).toBe(1);
+    // d-tag on the aggregate matches the 64-char Fedimint shape (not a
+    // Cashu 66-char or malformed shape).
+    expect(aggA?.d).toBe(fedimintFedA);
+    expect(aggB?.d).toBe(fedimintFedB);
+  });
+
   it("runs the corpus through createScheduler and converges with Layer B applied", async () => {
     const db = await freshDB();
     const { pool, pushEvent } = makeFakePool();

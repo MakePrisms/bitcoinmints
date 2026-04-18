@@ -27,15 +27,24 @@
 /**
  * NUT-06 `/v1/info` response shape — the subset we care about.
  *
- * Cashu mints in the wild don't all set every field. We type optional
- * everything except `pubkey` (NUT-06 mandatory + this is what Layer B
- * compares against the announcement signer). `nuts` is a bag of
- * NUT-name -> capability shape; we under-spec it here and pass through
- * whatever shape the mint emits — see data-model-v1.md §7.
+ * Cashu mints in the wild don't all set every field. We type EVERYTHING
+ * optional including `pubkey`: NUT-06 explicitly says "(optional) pubkey
+ * is the hex pubkey of the mint", and the audit (P0.2) found the prior
+ * hard-reject on missing pubkey rejected spec-conforming pubkey-less
+ * mints. Layer B handles the absent-pubkey case via NUT-06 `contact`
+ * with `method=nostr` (P0.1), or surfaces `null` when neither source
+ * is available. `nuts` is a bag of NUT-name -> capability shape; we
+ * under-spec it here and pass through whatever shape the mint emits —
+ * see data-model-v1.md §7.
  */
 export type MintInfoV1 = {
-  /** Mint's compressed/x-only secp256k1 pubkey. NUT-06 mandatory. */
-  pubkey: string;
+  /**
+   * Mint's compressed/x-only secp256k1 pubkey. NUT-06 says optional —
+   * many real mints omit it and rely on `contact.[method=nostr]` for
+   * signer binding instead. Layer B (cashu/layerB.ts) handles both
+   * sources.
+   */
+  pubkey?: string;
   name?: string;
   version?: string;
   description?: string;
@@ -179,8 +188,15 @@ export async function fetchMintInfo(
   }
 
   const obj = body as Record<string, unknown>;
+  // P0.2: pubkey is OPTIONAL per NUT-06. Don't reject on absence; Layer B
+  // falls through to `contact.[method=nostr]` for signer binding when
+  // `pubkey` is missing (see cashu/layerB.ts). When pubkey IS present but
+  // not a non-empty string, drop it from the result so downstream code
+  // doesn't compare against a malformed value (defensive: an emitter that
+  // sends `pubkey: null` shouldn't be treated as "matches null").
   if (typeof obj.pubkey !== "string" || obj.pubkey.length === 0) {
-    return { ok: false, error: "missing pubkey field", status: response.status };
+    const { pubkey: _omitted, ...rest } = obj;
+    return { ok: true, info: rest as MintInfoV1 };
   }
 
   return { ok: true, info: obj as MintInfoV1 };

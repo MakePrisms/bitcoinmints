@@ -26,6 +26,10 @@
  * Parse rejects (returns `null`):
  *   - `event.kind !== 38000`
  *   - missing or non-string `d` tag
+ *   - missing or non-`"38172"|"38173"` `k` tag (P0.3 — NIP-87 requires
+ *     the `k` tag to be the kind number being recommended; events without
+ *     it can't be routed to the right d-shape gate, so they're rejected
+ *     at parse rather than silently defaulted to Cashu)
  *
  * Parse does NOT reject on Layer A d-shape — the upsert gate handles that
  * so the parser stays pure and callable from tests, pagination dedup, etc.
@@ -41,20 +45,27 @@ const MAX_RATING = 5;
 /**
  * Content rating: `N/5` anchored at start. Tolerates leading `[` and
  * surrounding whitespace. Captures N.
+ *
+ * Anchoring at start is intentional: when a reviewer leads with `N/5`,
+ * that's the explicit signal. A `[N/5]` mid-content would be commentary
+ * about somebody else's rating, not the author's. Re-exported from this
+ * module (P1: rating-regex unification — nip87/parse.ts had a separate
+ * un-anchored `(\d(?:\.\d+)?)\s*\/\s*5/` that was a hidden conflict
+ * with this anchored canonical form).
  */
-const CONTENT_FIVE_REGEX = /^\s*\[?\s*(\d+)\s*\/\s*5\b/;
+export const CONTENT_FIVE_REGEX = /^\s*\[?\s*(\d+)\s*\/\s*5\b/;
 /**
  * Content rating: `N/10` anchored at start — for clients that use a
  * 10-point scale. Divide by 2 to normalize into 1..5.
  */
-const CONTENT_TEN_REGEX = /^\s*\[?\s*(\d+)\s*\/\s*10\b/;
+export const CONTENT_TEN_REGEX = /^\s*\[?\s*(\d+)\s*\/\s*10\b/;
 /**
  * Leading run of star emoji, 1..5 count. Matches `⭐` (U+2B50) and `🌟`
  * (U+1F31F) interchangeably — some clients render one, some the other,
  * some use the variation-selector form. Captures the whole run so we can
  * count code points (via the `u` flag).
  */
-const CONTENT_EMOJI_REGEX = /^\s*((?:⭐|🌟)+)/u;
+export const CONTENT_EMOJI_REGEX = /^\s*((?:⭐|🌟)+)/u;
 
 /** Pull the first value of a named tag (or undefined). */
 function firstTagValue(tags: string[][], name: string): string | undefined {
@@ -176,14 +187,39 @@ function parsePointerKind(tags: string[][]): 38172 | 38173 | undefined {
 
 /**
  * Parse a kind:38000 event into a ReviewRow. Returns `null` when the event
- * is the wrong kind or is missing the required `d` tag. Layer A d-tag
- * shape validation is deferred to the upsert layer.
+ * is the wrong kind, is missing the required `d` tag, or is missing the
+ * required `k` tag with value `"38172"` or `"38173"` (P0.3 — NIP-87
+ * mandates the `k` tag).
+ *
+ * Also returns null when the required `a` tag is missing or malformed
+ * (P1 — NIP-87 reviews reference their target via `a` of form
+ * `<kind>:<pubkey>:<d>`). The parsed `a` is exposed on the row as the
+ * spec-blessed dedup pointer.
+ *
+ * Layer A d-tag shape validation is deferred to the upsert layer.
  */
 export function parseReview(event: NostrEvent): ReviewRow | null {
   if (event.kind !== 38000) return null;
 
   const d = firstTagValue(event.tags, "d");
   if (d === undefined || d === "") return null;
+
+  // P0.3: k tag is REQUIRED per NIP-87 ("the k tag is the kind number that
+  // corresponds to the event kind being recommended"). The prior
+  // upsert-time fallback (default to Cashu) silently misrouted Fedimint
+  // reviews and let malformed events through. Rejecting at parse keeps the
+  // upstream stats accurate (rejectedByParse++) and means upsert can
+  // assume `k` is always set.
+  const k = parsePointerKind(event.tags);
+  if (k === undefined) return null;
+
+  // P1: a tag is REQUIRED per NIP-87 ("optional `a` of form
+  // <kind>:<pubkey>:<d>" — but when announcements live across multiple
+  // signers / replays, the `a` tag is the only unambiguous mint pointer.
+  // Per the conformance brief we now require it on parse). Validates to
+  // `<kind>:<hex-pubkey>:<d>` with kind matching `k`.
+  const a = parseATag(event.tags, k, d);
+  if (a === undefined) return null;
 
   const content = typeof event.content === "string" ? event.content : "";
   const rating = parseRatingFromTags(event.tags) ?? parseRatingFromContent(content) ?? null;
@@ -192,6 +228,8 @@ export function parseReview(event: NostrEvent): ReviewRow | null {
     pubkey: event.pubkey,
     kind: 38000,
     d,
+    k,
+    a,
     eventId: event.id,
     createdAt: event.created_at,
     content,
@@ -199,11 +237,49 @@ export function parseReview(event: NostrEvent): ReviewRow | null {
     rating,
   };
 
-  const k = parsePointerKind(event.tags);
-  if (k !== undefined) row.k = k;
-
   const u = allTagValues(event.tags, "u");
   if (u.length > 0) row.u = u;
 
   return row;
+}
+
+/**
+ * Parse and validate the `a` tag — NIP-87 reviews reference their target
+ * mint via `a` of the form `<kind>:<pubkey>:<d>`. Returns the canonical
+ * string when valid, `undefined` when missing / malformed.
+ *
+ * Validation rules:
+ *   - The tag's value must be a string.
+ *   - The format is `kind:pubkey:d` (3 colon-separated parts).
+ *   - `kind` must match the parsed `k` tag (so a review can't claim
+ *     `["k","38172"]` while pointing its `a` at a Fedimint federation).
+ *   - `pubkey` must be 64-char lowercase hex (event signer shape).
+ *   - `d` must match the review's own `d` tag — they're meant to align
+ *     per the spec.
+ *
+ * Strict matching keeps the spec contract intact. The audit's P1 entry
+ * specifically calls out a "review with malformed a tag rejection test"
+ * as a regression target.
+ */
+function parseATag(tags: string[][], k: 38172 | 38173, d: string): string | undefined {
+  const aRaw = firstTagValue(tags, "a");
+  if (aRaw === undefined) return undefined;
+  // Format: <kind>:<pubkey>:<d>. Use indexOf to split rather than `split(":")`
+  // because the `d` portion could conceivably contain a colon (the spec
+  // doesn't forbid it). Only the first two colons are structural.
+  const firstColon = aRaw.indexOf(":");
+  if (firstColon <= 0) return undefined;
+  const secondColon = aRaw.indexOf(":", firstColon + 1);
+  if (secondColon <= firstColon + 1) return undefined;
+  const kindStr = aRaw.slice(0, firstColon);
+  const pubkeyStr = aRaw.slice(firstColon + 1, secondColon);
+  const dStr = aRaw.slice(secondColon + 1);
+  if (dStr.length === 0) return undefined;
+  // kind must equal the k tag.
+  if (kindStr !== String(k)) return undefined;
+  // pubkey must be 64-char lowercase hex.
+  if (!/^[0-9a-f]{64}$/.test(pubkeyStr)) return undefined;
+  // d must equal the review's own d.
+  if (dStr !== d) return undefined;
+  return aRaw;
 }

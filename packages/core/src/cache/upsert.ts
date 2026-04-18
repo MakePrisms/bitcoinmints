@@ -98,18 +98,12 @@ export async function upsertAnnouncement(
 /**
  * Upsert a kind:38000 review with Layer A gating on the target `d` tag.
  *
- * The review's `d` points at a mint. When `k === 38172` (or `k` is absent,
- * which is how most in-the-wild Cashu reviews shape), we apply the same
- * Layer A d-regex gate that `upsertAnnouncement` uses — if the referenced
- * mint pubkey isn't 64/66-char hex, the review is bot-spam pointing at
- * bot-spam, returned as `rejected-invalid`. This is the firewall that
- * keeps the 959 zero-d-tag bot spam events (per relay-strategy §4) from
- * filtering up into the ranking aggregate.
- *
- * `k === 38173` (Fedimint) switches to the sibling `isValidFedimintDTag`
- * shape gate — every real federation ID in the audit corpus is lowercase
- * 64-char hex, so a short / junk d-tag with `k=38173` attached is still
- * bot spam and must be caught by the same firewall.
+ * The review's `d` points at a mint. The pointer-kind `k` selects which
+ * shape gate applies: `k === 38173` uses `isValidFedimintDTag`, else
+ * `isValidCashuDTag`. P0.3: `parseReview` rejects events without a valid
+ * `k` tag at parse, so by the time a row reaches this function, `k` is
+ * always set (38172 or 38173). The previous fallback ("no k → default to
+ * Cashu") silently misrouted Fedimint reviews and let bot spam through.
  *
  * Note: this low-level upsert is the mechanical write. It does NOT
  * materialize the `mintAggregate` row — the `reviews/` wrapper composes
@@ -120,11 +114,8 @@ export async function upsertAnnouncement(
  */
 export async function upsertReview(db: BitcoinmintsDB, row: ReviewRow): Promise<UpsertResult> {
   // Layer A gate — reject invalid d-tag shapes before touching the DB.
-  // Reviews point at a target mint via `d`; the pointer-kind `k` selects
-  // which shape gate applies. No `k` tag → treat as Cashu (the default
-  // for in-the-wild events per rating-tag-research §3). Fedimint rows
-  // still get a sibling shape check (64-char hex federation id) so junk
-  // d-tags with `k=38173` slapped on don't free-pass the firewall.
+  // P0.3: `k` is required at parse time, so we route purely on its value;
+  // no implicit Cashu default for missing k.
   if (row.k === 38173) {
     if (!isValidFedimintDTag(row.d)) return "rejected-invalid";
   } else if (!isValidCashuDTag(row.d)) {
