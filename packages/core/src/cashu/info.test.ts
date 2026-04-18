@@ -142,20 +142,27 @@ describe("fetchMintInfo — failure modes", () => {
     expect(r.error).toBe("invalid JSON");
   });
 
-  it("returns 'missing pubkey field' when JSON parses but lacks pubkey", async () => {
+  it("P0.2: passes through with pubkey absent when JSON lacks pubkey (NUT-06 says optional)", async () => {
+    // NUT-06 §"info": pubkey is optional — Layer B falls through to
+    // `contact.[method=nostr]` for signer binding (P0.1). Don't hard-reject.
     fetchSpy.mockResolvedValueOnce(jsonResponse({ name: "no key here" }));
     const r = await fetchMintInfo("https://mint.example.com");
-    expect(r.ok).toBe(false);
-    if (r.ok) return;
-    expect(r.error).toBe("missing pubkey field");
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.info.pubkey).toBeUndefined();
+    expect(r.info.name).toBe("no key here");
   });
 
-  it("returns 'missing pubkey field' when pubkey is empty string", async () => {
-    fetchSpy.mockResolvedValueOnce(jsonResponse({ pubkey: "" }));
+  it("P0.2: drops malformed pubkey (empty string) but keeps the response ok", async () => {
+    // Defensive: empty string isn't a valid pubkey — drop it so downstream
+    // signer-binding doesn't compare against `""` and accidentally match a
+    // signer with a similarly empty value.
+    fetchSpy.mockResolvedValueOnce(jsonResponse({ pubkey: "", name: "some mint" }));
     const r = await fetchMintInfo("https://mint.example.com");
-    expect(r.ok).toBe(false);
-    if (r.ok) return;
-    expect(r.error).toBe("missing pubkey field");
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.info.pubkey).toBeUndefined();
+    expect(r.info.name).toBe("some mint");
   });
 });
 

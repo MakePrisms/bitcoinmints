@@ -164,8 +164,12 @@ describe("scheduler — pipeline (single event)", () => {
     const db = await freshDB();
     const { pool, pushEvent } = makeFakePool();
     const pubkey = "02".padEnd(66, "b");
+    // Wrong pubkey, but valid hex (so P0.1 normalization treats it as a
+    // candidate signer source — a non-hex value would silently drop and
+    // produce `no-signer-source`, which the scheduler maps to null, not
+    // false).
     const { fetcher } = makeFetcher({
-      "https://mint.example.com": "02".padEnd(66, "z"),
+      "https://mint.example.com": "02".padEnd(66, "f"),
     });
     const sched = createScheduler({ db, pool, fetcher, relays: ["wss://test"] });
     await sched.start();
