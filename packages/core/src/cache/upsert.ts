@@ -54,8 +54,10 @@ function nextWins(
 ): boolean {
   if (next.createdAt > prev.createdAt) return true;
   if (next.createdAt < prev.createdAt) return false;
-  // Tiebreak: lexicographically higher eventId wins.
-  return next.eventId > prev.eventId;
+  // Tiebreak: per NIP-01, the event with the LOWEST id (first in lexical
+  // order) is retained. So `next` supersedes `prev` only when next.eventId
+  // is lex-lower than prev.eventId. Equal ids are a no-op (false).
+  return next.eventId < prev.eventId;
 }
 
 /** Upsert a kind:38172 or kind:38173 announcement with Layer A gating on both kinds. */
