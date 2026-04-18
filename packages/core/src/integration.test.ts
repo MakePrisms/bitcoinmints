@@ -184,8 +184,9 @@ describe("integration: corpus replay → parse → cache", () => {
 describe("integration: CAS convergence under simulated multi-relay race", () => {
   it("multi-relay echo of the same event id: 1 row, 1 inserted + 2 rejected-stale, deterministic", async () => {
     // Three relays publish the same canonical event. Same id, same key,
-    // same createdAt — the equal-eventId loses the tiebreak (next > prev is
-    // false), so re-broadcasts always end as 'rejected-stale'. No churn.
+    // same createdAt — the equal-eventId loses the tiebreak (next < prev is
+    // false on equal), so re-broadcasts always end as 'rejected-stale'. No
+    // churn.
     const legacy = f.cashu38172Legacy[0];
     expect(legacy).toBeDefined();
     if (!legacy) return;
@@ -208,12 +209,12 @@ describe("integration: CAS convergence under simulated multi-relay race", () => 
     expect(stale.length).toBe(2);
   });
 
-  it("tiebreak under race: 3 events with same [pubkey,kind,d,createdAt] but different eventIds — highest eventId always wins, 10 shuffled trials", async () => {
+  it("tiebreak under race: 3 events with same [pubkey,kind,d,createdAt] but different eventIds — lowest eventId always wins (NIP-01), 10 shuffled trials", async () => {
     // Real-world: same logical replaceable event published by the same
     // signer at the same second but with different ids (e.g. retried after
-    // a sig collision, or re-emitted by a buggy client). The lex-highest
-    // eventId must win deterministically every time, regardless of arrival
-    // order.
+    // a sig collision, or re-emitted by a buggy client). NIP-01: the
+    // lex-LOWEST eventId must win deterministically every time, regardless
+    // of arrival order.
     const legacy = f.cashu38172Legacy[0];
     expect(legacy).toBeDefined();
     if (!legacy) return;
@@ -244,8 +245,8 @@ describe("integration: CAS convergence under simulated multi-relay race", () => 
 
       expect(await db.announcements.count()).toBe(1);
       const fetched = await db.announcements.get([baseRow.pubkey, baseRow.kind, baseRow.d]);
-      expect(fetched?.eventId).toBe(eidHigh);
-      expect(fetched?.content).toBe("hi");
+      expect(fetched?.eventId).toBe(eidLow);
+      expect(fetched?.content).toBe("lo");
     }
   });
 });
