@@ -397,4 +397,37 @@ describe("verifySignerBinding — multi-URL matched URL tracking", () => {
     expect(r.url).toBe("https://right.example");
     expect(r.url).not.toBe("https://wrong.example");
   });
+
+  it("P0.1: info.pubkey match wins over mismatched contact.nostr", async () => {
+    // Gap 4: the collectSignerSources function returns BOTH info.pubkey AND
+    // contact.[method=nostr] entries as candidate signer sources. When
+    // info.pubkey matches the signer but contact.nostr declares a DIFFERENT
+    // pubkey, the binding must still verify via info.pubkey alone — any one
+    // matching source is sufficient (P0.1 union semantics).
+    //
+    // The previous hypothesis was that a mismatched contact.nostr could
+    // poison the match logic. This test pins that hypothesis false: the
+    // match short-circuits on the first positive source (info.pubkey here),
+    // and the mismatched contact.nostr is simply ignored.
+    const signerPubkey = "a".repeat(64);
+    const otherPubkey = "b".repeat(64);
+    const row = makeRow({
+      pubkey: signerPubkey,
+      u: ["https://mint.example.com"],
+    });
+    const fetcher: MintInfoFetcher = vi.fn(
+      async (): Promise<MintInfoResult> => ({
+        ok: true,
+        info: {
+          pubkey: signerPubkey, // matches signer
+          contact: [{ method: "nostr", info: otherPubkey }], // does NOT match — but ignored
+        },
+      }),
+    );
+    const r = await verifySignerBinding(row, fetcher);
+    expect(r.verified).toBe(true);
+    if (!r.verified) return;
+    expect(r.url).toBe("https://mint.example.com");
+    expect(r.info.pubkey).toBe(signerPubkey);
+  });
 });

@@ -286,6 +286,170 @@ describe("scheduler — pipeline (single event)", () => {
     expect(sched.getStats().accepted).toBe(1);
   });
 
+  it("P0.3/P1: review rejected at parse increments rejectedByParse", async () => {
+    // Gap 1: `parseReview` returns null when the k tag is missing (P0.3),
+    // the a tag is missing (P1), or the a tag is malformed (P1 — kind
+    // mismatch, bad pubkey shape, d mismatch). Each of those parse rejects
+    // increments `stats.rejectedByParse` in the scheduler and never touches
+    // the reviews table. This pins that wiring end-to-end — the layer that
+    // catches a malformed event at parse (rather than Layer A at upsert)
+    // is observable via the right stats bucket, not silently absorbed.
+    const db = await freshDB();
+    const { pool, pushEvent } = makeFakePool();
+    const { fetcher } = makeFetcher({});
+    const sched = createScheduler({ db, pool, fetcher, relays: ["wss://test"] });
+    await sched.start();
+
+    const reviewerPk = "1".repeat(64);
+    const targetD = "02".padEnd(66, "a");
+
+    // Case A: missing k tag (P0.3).
+    await pushEvent({
+      id: "review-missing-k",
+      kind: 38000,
+      pubkey: reviewerPk,
+      created_at: 1_700_000_000,
+      tags: [
+        ["d", targetD],
+        ["a", `38172:${reviewerPk}:${targetD}`],
+        ["rating", "5", "5"],
+      ],
+      content: "[5/5] no k tag",
+      sig: "fake",
+    });
+    await settle();
+    expect(sched.getStats().rejectedByParse).toBe(1);
+    expect(sched.getStats().accepted).toBe(0);
+    expect(await db.reviews.count()).toBe(0);
+
+    // Case B: missing a tag (P1).
+    await pushEvent({
+      id: "review-missing-a",
+      kind: 38000,
+      pubkey: reviewerPk,
+      created_at: 1_700_000_001,
+      tags: [
+        ["k", "38172"],
+        ["d", targetD],
+        ["rating", "5", "5"],
+      ],
+      content: "[5/5] no a tag",
+      sig: "fake",
+    });
+    await settle();
+    expect(sched.getStats().rejectedByParse).toBe(2);
+    expect(sched.getStats().accepted).toBe(0);
+    expect(await db.reviews.count()).toBe(0);
+
+    // Case C: malformed a tag (kind mismatch — claims k=38172 but a.kind=38173).
+    await pushEvent({
+      id: "review-malformed-a",
+      kind: 38000,
+      pubkey: reviewerPk,
+      created_at: 1_700_000_002,
+      tags: [
+        ["k", "38172"],
+        ["d", targetD],
+        ["a", `38173:${reviewerPk}:${targetD}`], // kind mismatch vs k
+        ["rating", "5", "5"],
+      ],
+      content: "[5/5] malformed a",
+      sig: "fake",
+    });
+    await settle();
+    expect(sched.getStats().rejectedByParse).toBe(3);
+    expect(sched.getStats().accepted).toBe(0);
+    expect(await db.reviews.count()).toBe(0);
+
+    await sched.stop();
+  });
+
+  it("P0.2: no-signer-source persists as null, not false", async () => {
+    // Gap 2: P0.2 allows a Cashu mint to omit `info.pubkey`, and P0.1
+    // widens the signer source to also include `info.contact.[method=nostr]`.
+    // When BOTH are absent on an otherwise-ok /v1/info response, Layer B
+    // returns `no-signer-source`. The scheduler must persist that as
+    // `verifiedBySignerBinding === null` (genuinely unverifiable — retry
+    // eligible) rather than `false` (real negative verdict). The
+    // `verdictForPersistence` helper explicitly maps no-signer-source → null
+    // via the "only pubkey-mismatch is a real negative verdict" branch.
+    //
+    // This pins end-to-end: push an announcement whose /v1/info exposes
+    // neither pubkey nor contact.nostr, then assert the persisted row's
+    // verifiedBySignerBinding is exactly null (not false, not true). A
+    // regression to "false" here would silently hide retry-eligible mints
+    // from the UI's "unverified but trying" bucket.
+    const db = await freshDB();
+    const { pool, pushEvent } = makeFakePool();
+    const pubkey = "02".padEnd(66, "3");
+    // Custom fetcher: returns ok with NO pubkey and NO contact.nostr entry.
+    const fetcher: MintInfoFetcher = async (): Promise<MintInfoResult> => ({
+      ok: true,
+      info: {
+        name: "pubkey-less mint",
+        contact: [{ method: "email", info: "ops@example.com" }],
+      },
+    });
+    const sched = createScheduler({ db, pool, fetcher, relays: ["wss://test"] });
+    await sched.start();
+
+    await pushEvent(makeAnnouncement({ pubkey, d: pubkey, u: ["https://mint.example.com"] }));
+    await settle();
+
+    const row = await db.announcements.get([pubkey, 38172, pubkey]);
+    expect(row).toBeDefined();
+    // The load-bearing assertion: null distinguishes "couldn't verify yet"
+    // from "verified and failed". A regression to `false` would mean a
+    // spec-conforming pubkey-less mint is permanently flagged as invalid.
+    expect(row?.verifiedBySignerBinding).toBeNull();
+
+    // The /v1/info response was parsed successfully — a diagnostic
+    // MintInfoRow is written with ok:false and the reason, so the UI can
+    // explain why the row is un-verified while still displaying it.
+    const mintInfo = await db.mintInfo.get(pubkey);
+    expect(mintInfo?.ok).toBe(false);
+    expect(mintInfo?.lastError).toBe("no-signer-source");
+
+    // Note on stats: the current scheduler increments `layerBFailed` for
+    // every non-verified result (including transient/null verdicts). The
+    // null persistence is the correctness contract this test locks in;
+    // the stats-bucket naming is an observability detail tracked
+    // separately. If/when the scheduler splits transient-vs-real into two
+    // counters, this assertion should be updated.
+    expect(sched.getStats().layerBFailed).toBe(1);
+    expect(sched.getStats().layerBVerified).toBe(0);
+
+    await sched.stop();
+
+    // PR #30 restart-replay behavior: rows with verifiedBySignerBinding=null
+    // are re-enqueued on scheduler restart so a transiently-unverifiable
+    // mint gets another chance. We verify the re-enqueue by restarting a
+    // fresh scheduler on the same DB and confirming the fetcher is called
+    // again.
+    const { pool: pool2 } = makeFakePool();
+    let secondCallCount = 0;
+    const fetcher2: MintInfoFetcher = async (): Promise<MintInfoResult> => {
+      secondCallCount += 1;
+      return {
+        ok: true,
+        info: {
+          name: "pubkey-less mint",
+          contact: [{ method: "email", info: "ops@example.com" }],
+        },
+      };
+    };
+    const sched2 = createScheduler({
+      db,
+      pool: pool2,
+      fetcher: fetcher2,
+      relays: ["wss://test"],
+    });
+    await sched2.start();
+    await settle();
+    expect(secondCallCount).toBeGreaterThanOrEqual(1);
+    await sched2.stop();
+  });
+
   it("kind:0 profile flows into profiles table; kind:10002 into relayLists", async () => {
     const db = await freshDB();
     const { pool, pushEvent } = makeFakePool();
