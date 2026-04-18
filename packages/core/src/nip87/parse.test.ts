@@ -248,7 +248,26 @@ describe("parseRecommendation", () => {
     expect(parsed?.rating).toBeUndefined();
   });
 
-  it("accepts fractional ratings via content regex (3.5/5)", () => {
+  it("P1: accepts integer ratings via content regex (3/5)", () => {
+    // After P1 unification, `parseRecommendation`'s content regex aligns
+    // with `parseReview`'s anchored integer-only form. Decimals like
+    // `3.5/5` no longer match (the canonical regex captures `\d+`); the
+    // ecosystem reviews observed in the audit corpus all use integer
+    // ratings, so this isn't a real-data regression.
+    const event: NostrEvent = {
+      id: "int",
+      pubkey: "0".repeat(64),
+      created_at: 1234,
+      kind: 38000,
+      tags: [["d", `02${"0".repeat(64)}`]],
+      content: "[3/5] meh",
+      sig: "sig",
+    };
+    const parsed = parseRecommendation(event);
+    expect(parsed?.rating).toBe(3);
+  });
+
+  it("P1: rejects fractional rating (3.5/5) — canonical regex is integer-only", () => {
     const event: NostrEvent = {
       id: "frac",
       pubkey: "0".repeat(64),
@@ -259,7 +278,10 @@ describe("parseRecommendation", () => {
       sig: "sig",
     };
     const parsed = parseRecommendation(event);
-    expect(parsed?.rating).toBe(3.5);
+    // After unification: the regex captures `(\d+)` which won't match
+    // `3.5` as a single integer. The dot terminates the capture; the
+    // remaining `5/5` isn't anchored to start so doesn't fire either.
+    expect(parsed?.rating).toBeUndefined();
   });
 
   it("rejects out-of-range ratings from content regex", () => {

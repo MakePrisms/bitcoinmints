@@ -45,20 +45,27 @@ const MAX_RATING = 5;
 /**
  * Content rating: `N/5` anchored at start. Tolerates leading `[` and
  * surrounding whitespace. Captures N.
+ *
+ * Anchoring at start is intentional: when a reviewer leads with `N/5`,
+ * that's the explicit signal. A `[N/5]` mid-content would be commentary
+ * about somebody else's rating, not the author's. Re-exported from this
+ * module (P1: rating-regex unification — nip87/parse.ts had a separate
+ * un-anchored `(\d(?:\.\d+)?)\s*\/\s*5/` that was a hidden conflict
+ * with this anchored canonical form).
  */
-const CONTENT_FIVE_REGEX = /^\s*\[?\s*(\d+)\s*\/\s*5\b/;
+export const CONTENT_FIVE_REGEX = /^\s*\[?\s*(\d+)\s*\/\s*5\b/;
 /**
  * Content rating: `N/10` anchored at start — for clients that use a
  * 10-point scale. Divide by 2 to normalize into 1..5.
  */
-const CONTENT_TEN_REGEX = /^\s*\[?\s*(\d+)\s*\/\s*10\b/;
+export const CONTENT_TEN_REGEX = /^\s*\[?\s*(\d+)\s*\/\s*10\b/;
 /**
  * Leading run of star emoji, 1..5 count. Matches `⭐` (U+2B50) and `🌟`
  * (U+1F31F) interchangeably — some clients render one, some the other,
  * some use the variation-selector form. Captures the whole run so we can
  * count code points (via the `u` flag).
  */
-const CONTENT_EMOJI_REGEX = /^\s*((?:⭐|🌟)+)/u;
+export const CONTENT_EMOJI_REGEX = /^\s*((?:⭐|🌟)+)/u;
 
 /** Pull the first value of a named tag (or undefined). */
 function firstTagValue(tags: string[][], name: string): string | undefined {

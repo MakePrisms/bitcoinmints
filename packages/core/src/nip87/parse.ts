@@ -1,4 +1,5 @@
 import type { Event as NostrEvent } from "nostr-tools/core";
+import { CONTENT_FIVE_REGEX } from "../reviews/parse";
 import type { MintAnnouncement, MintAnnouncementNetwork, MintRecommendation } from "./types";
 
 const KNOWN_NETWORKS = new Set<MintAnnouncementNetwork>([
@@ -7,9 +8,6 @@ const KNOWN_NETWORKS = new Set<MintAnnouncementNetwork>([
   "signet",
   "regtest",
 ]);
-
-/** Matches `[N/5]` or `[N.M/5]` anywhere in the content, with optional whitespace. */
-const CONTENT_RATING_REGEX = /(\d(?:\.\d+)?)\s*\/\s*5/;
 
 function firstTagValue(tags: string[][], name: string): string | undefined {
   for (const t of tags) {
@@ -136,7 +134,17 @@ function parseRatingFromTags(tags: string[][]): number | undefined {
 }
 
 function parseRatingFromContent(content: string): number | undefined {
-  const match = content.match(CONTENT_RATING_REGEX);
+  // P1: use the canonical anchored regex from reviews/parse.ts. The prior
+  // un-anchored `(\d(?:\.\d+)?)\s*\/\s*5` was inconsistent with the live
+  // path (`parseReview`) — a `[5/5]` mid-content would match here but not
+  // there. Unifying on the anchored form fixes the silent divergence;
+  // legitimate reviews lead with the rating per ecosystem convention so
+  // anchoring doesn't lose any real data.
+  //
+  // The reviews-layer regex captures integers only (1..5). Historically
+  // this parser admitted floats like `3.5` from content; we preserve the
+  // float-tolerance by post-parsing with parseFloat and clamping to [0,5].
+  const match = content.match(CONTENT_FIVE_REGEX);
   if (!match?.[1]) return undefined;
   const n = Number.parseFloat(match[1]);
   if (Number.isFinite(n) && n >= 0 && n <= 5) return n;
