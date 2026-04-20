@@ -42,12 +42,20 @@ const EID_LOW = `${"0".repeat(60)}aaaa`;
 const EID_HIGH = `${"0".repeat(60)}ffff`;
 
 function makeReview(over: Partial<ReviewRow> = {}): ReviewRow {
+  const pubkey = over.pubkey ?? `pk${"0".repeat(60)}1`;
+  const d = over.d ?? D_VALID;
+  const kind = 38000 as const;
+  // `k` defaults to Cashu (38172); one test below overrides to 38173 for the
+  // Fedimint path. `a` is derived per NIP-87 `<kind>:<pubkey>:<d>`.
+  const k = over.k ?? 38172;
   return {
-    pubkey: `pk${"0".repeat(60)}1`,
-    kind: 38000,
-    d: D_VALID,
+    pubkey,
+    kind,
+    d,
     eventId: EID_LOW,
     createdAt: 1_700_000_000,
+    k,
+    a: `${kind}:${pubkey}:${d}`,
     content: "",
     rawTags: [],
     rating: 5,
