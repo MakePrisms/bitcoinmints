@@ -34,10 +34,16 @@ function dForIndex(n: number): string {
 }
 
 function makeReview(over: Partial<ReviewRow> & { pubkey: string; d: string }): ReviewRow {
+  const kind = 38000 as const;
+  // `k` defaults to Cashu (38172); rank.test only exercises sort order,
+  // which is `k`-agnostic. `a` is derived per NIP-87 `<kind>:<pubkey>:<d>`.
+  const k = over.k ?? 38172;
   return {
-    kind: 38000,
+    kind,
     eventId: `${"0".repeat(58)}${over.pubkey.slice(-6)}`,
     createdAt: 1_700_000_000,
+    k,
+    a: `${kind}:${over.pubkey}:${over.d}`,
     content: "",
     rawTags: [],
     rating: 5,
