@@ -29,12 +29,21 @@ const D_A = "5fe928ae0970844f3c5253d2e85a88788486edcbd96c070334a4a2d0d0154a77";
 const D_B = "0".repeat(63) + "1";
 
 function makeReview(over: Partial<ReviewRow> & { d?: string } = {}): ReviewRow {
+  const pubkey = over.pubkey ?? `pk${Math.random().toString(36).slice(2, 10)}${"0".repeat(50)}`;
+  const d = over.d ?? D_A;
+  const kind = 38000 as const;
+  // `k` defaults to Cashu (38172) — tests in this file don't differentiate
+  // Cashu vs Fedimint; parse-level `k` handling is covered in parse.test.ts.
+  // `a` is derived from kind/pubkey/d per NIP-87's `<kind>:<pubkey>:<d>`.
+  const k = over.k ?? 38172;
   return {
-    pubkey: `pk${Math.random().toString(36).slice(2, 10)}${"0".repeat(50)}`,
-    kind: 38000,
-    d: over.d ?? D_A,
+    pubkey,
+    kind,
+    d,
     eventId: `${"0".repeat(58)}${Math.random().toString(36).slice(2, 8)}`,
     createdAt: 1_700_000_000,
+    k,
+    a: `${kind}:${pubkey}:${d}`,
     content: "",
     rawTags: [],
     rating: 5,
